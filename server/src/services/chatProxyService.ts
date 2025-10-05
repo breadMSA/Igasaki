@@ -8,6 +8,8 @@ import {
 import { config } from '@/lib/config.js';
 import { logger } from '@/lib/logger.js';
 import CharacterAI from './characterAI.js';
+import TTSService from './ttsService.js';
+import axios from 'axios';
 
 /**
  * 聊天代理服務
@@ -17,15 +19,23 @@ export class ChatProxyService {
   private characterAI: CharacterAI;
   private defaultCharacterId: string;
   private activeChatId: string | null = null;
+  private lastTurnId: string | null = null;
+  private lastCandidateId: string | null = null;
+  private ttsService: TTSService; // 添加 ttsService 屬性
 
   constructor() {
     this.characterAI = new CharacterAI();
     // 從環境變數獲取預設角色 ID，如果沒有則使用一個通用的
-    this.defaultCharacterId = process.env.DEFAULT_CHARACTER_ID || 'default-character-id';
+    this.defaultCharacterId = config.characterAICharacterId || process.env.DEFAULT_CHARACTER_ID || 'default-character-id';
     
-    if (config.chatProxyApiKey) {
+    if (config.characterAIToken) {
+      this.characterAI.setToken(config.characterAIToken);
+    } else if (config.chatProxyApiKey) {
       this.characterAI.setToken(config.chatProxyApiKey);
     }
+
+    // 在這裡初始化 TTSService 並傳入已經驗證的 CharacterAI 實例
+    this.ttsService = new TTSService(this, this.characterAI);
   }
 
   /**
@@ -40,20 +50,48 @@ export class ChatProxyService {
       // 確保有聊天會話
       const chatId = await this.ensureChatSession(request.characterId);
       
-      // 發送訊息
+      // 發送訊息（支持 streaming）
       const response = await this.characterAI.sendMessage(
         request.characterId || this.defaultCharacterId,
         chatId,
-        request.message
+        request.message,
+        true // 啟用 streaming
       );
+
+      // 保存最新的 turn_id 和 candidate_id
+      logger.info('Saving chat IDs', { 
+        turn_id: response.turn_id, 
+        candidate_id: response.candidates?.[0]?.candidate_id 
+      });
+      
+      if (response.turn_id) {
+        this.lastTurnId = response.turn_id;
+        logger.info('Saved turn_id', { turn_id: this.lastTurnId });
+      }
+      if (response.candidates && response.candidates.length > 0 && response.candidates[0].candidate_id) {
+        this.lastCandidateId = response.candidates[0].candidate_id;
+        logger.info('Saved candidate_id', { candidate_id: this.lastCandidateId });
+      }
 
       // 將回應轉換為多段式
       const utterances = this.parseResponseToUtterances(response.text);
       
       for (const utterance of utterances) {
+        const utteranceData = { 
+          text: utterance,
+          // 將 ID 傳回前端
+          turnId: this.lastTurnId,
+          candidateId: this.lastCandidateId
+        };
+        
+        logger.info('Sending utterance with IDs', { 
+          turnId: this.lastTurnId, 
+          candidateId: this.lastCandidateId 
+        });
+        
         yield { 
           type: 'utterance', 
-          data: { text: utterance } 
+          data: utteranceData
         };
       }
 
@@ -71,49 +109,99 @@ export class ChatProxyService {
   }
 
   /**
-   * 生成語音（chat-say 模式）
+   * 生成語音（直接使用 Character.AI TTS API）
    */
-  async generateSpeech(text: string, voiceId?: string): Promise<Buffer> {
+  async generateSpeech(text: string, voiceId?: string, turnId?: string, candidateId?: string): Promise<Buffer> {
     try {
       this.validateSpeechRequest(text);
       
-      logger.logSafeContent('info', 'Generating speech via chat-say mode', text);
+      logger.logSafeContent('info', 'Generating speech via Character.AI TTS', text);
 
       // 清理文字
       const cleanedText = this.cleanTextForSpeech(text);
       
-      // 構造語音生成訊息
-      const speechMessage = this.buildSpeechMessage(cleanedText);
-      
       // 確保有聊天會話
       const chatId = await this.ensureChatSession();
       
-      // 發送語音請求（使用特殊的 TTS 角色或設定）
-      const response = await this.characterAI.sendMessage(
-        this.defaultCharacterId,
-        chatId,
-        speechMessage
-      );
-
-      // 如果 Character.AI 支援直接語音生成
-      if (response.turn_id && response.candidates[0]?.candidate_id) {
-        try {
-          const audioBuffer = await this.characterAI.generateSpeech(
-            chatId,
-            response.turn_id,
-            response.candidates[0].candidate_id,
-            voiceId || config.chatProxyVoiceId
-          );
-          
-          logger.info('Speech generated successfully via Character.AI');
-          return audioBuffer;
-        } catch (speechError) {
-          logger.warn('Direct speech generation failed, falling back to error response', { error: speechError });
-          throw new ExternalServiceError('ChatProxy', 'Speech generation not available');
+      // 直接使用 memo/replay API（參考 PyCharacterAI）
+      logger.info('Generating speech using memo/replay API...');
+      
+      // 使用傳入的 ID 或保存的 ID
+      try {
+        let actualTurnId = turnId || this.lastTurnId;
+        let actualCandidateId = candidateId || this.lastCandidateId;
+        
+        // 如果沒有 ID，則無法生成語音
+        if (!actualTurnId || !actualCandidateId) {
+          throw new ExternalServiceError('ChatProxy', 'No valid turn ID or candidate ID available. Please send a chat message first.');
         }
-      }
+        
+        const payload = {
+          candidateId: actualCandidateId,
+          roomId: chatId,
+          turnId: actualTurnId,
+          voiceId: voiceId || config.chatProxyVoiceId || 'default'
+        };
+        
+        // 使用 Character.AI 的 memo/replay API 生成語音
+        logger.info('Generating speech via Character.AI memo/replay API...');
+        
+        const endpoint = 'https://neo.character.ai/multimodal/api/v1/memo/replay';
+        const urlResponse = await axios({
+          method: 'POST',
+          url: endpoint,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${config.characterAIToken}`,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0',
+            'Accept': 'application/json',
+            'Origin': 'https://character.ai',
+            'Referer': 'https://character.ai/'
+          },
+          data: payload,
+          timeout: 15000
+        });
+        
+        if (urlResponse.status !== 200) {
+          const responseData = urlResponse.data;
+          if (responseData?.command === 'neo_error') {
+            const errorComment = responseData.comment || '';
+            throw new ExternalServiceError('CharacterAI', `Cannot generate speech. ${errorComment}`);
+          } else if (responseData?.error?.message) {
+            throw new ExternalServiceError('CharacterAI', `Cannot generate speech. ${responseData.error.message}`);
+          } else if (responseData?.message) {
+            throw new ExternalServiceError('CharacterAI', `Cannot generate speech. ${responseData.message}`);
+          }
+          throw new ExternalServiceError('CharacterAI', 'Cannot generate speech.');
+        }
 
-      throw new ExternalServiceError('ChatProxy', 'Speech generation not supported');
+        const audioUrl = urlResponse.data?.replayUrl;
+        if (!audioUrl) {
+          throw new ExternalServiceError('CharacterAI', 'No audio URL returned');
+        }
+
+        // 第二步：下載音頻內容
+        const audioResponse = await axios({
+          method: 'GET',
+          url: audioUrl,
+          responseType: 'arraybuffer',
+          timeout: 30000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0'
+          }
+        });
+
+        if (audioResponse.status === 200 && audioResponse.data) {
+          logger.info('Speech generation completed successfully');
+          return Buffer.from(audioResponse.data);
+        }
+
+        throw new ExternalServiceError('CharacterAI', 'Cannot generate speech.');
+        
+      } catch (error) {
+        logger.error('Character.AI speech generation failed', { error });
+        throw new ExternalServiceError('CharacterAI', `Speech generation failed: ${error}`);
+      }
 
     } catch (error) {
       logger.error('Speech generation failed', { error: error instanceof Error ? error.message : String(error) });
@@ -147,9 +235,7 @@ export class ChatProxyService {
       throw new ValidationError('Message cannot be empty');
     }
 
-    if (request.message.length > 4000) {
-      throw new ValidationError('Message is too long (max 4000 characters)');
-    }
+    // 移除長度限制，允許記憶注入的長消息
   }
 
   /**
@@ -169,6 +255,10 @@ export class ChatProxyService {
     }
   }
 
+
+
+
+
   /**
    * 確保聊天會話存在
    */
@@ -177,6 +267,20 @@ export class ChatProxyService {
       // 如果已有活動聊天，直接使用
       if (this.activeChatId) {
         return this.activeChatId;
+      }
+
+      // 檢查是否有配置的現有聊天 ID
+      if (config.characterAIChatId) {
+        try {
+          const existingChat = await this.characterAI.getChatById(config.characterAIChatId);
+          if (existingChat) {
+            this.activeChatId = existingChat.chat_id;
+            logger.info('Using existing chat session from config', { chatId: this.activeChatId });
+            return this.activeChatId;
+          }
+        } catch (error) {
+          logger.warn('Failed to get existing chat from config, creating new one', { error });
+        }
       }
 
       // 創建新的聊天會話
@@ -201,22 +305,53 @@ export class ChatProxyService {
       return ['抱歉，我沒有回應。'];
     }
 
-    // 按段落分割
+    // 如果文字很短（少於100字），不分段
+    if (text.trim().length < 100) {
+      return [text.trim()];
+    }
+
+    // 按段落分割（雙換行）
     const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
     
     if (paragraphs.length > 1) {
       return paragraphs.map(p => p.trim());
     }
 
-    // 按句子分割
-    const sentences = text.split(/[。！？.!?]/).filter(s => s.trim().length > 10);
+    // 按句子分割，但避免在冒號後分割
+    const sentences = text.split(/[。！？.!?]/).filter(s => s.trim().length > 25);
     
-    if (sentences.length > 1 && sentences.length <= 5) {
-      return sentences.map(s => s.trim() + (s.includes('。') ? '' : '。'));
+    if (sentences.length > 2) {
+      const result: string[] = [];
+      let currentSentence = '';
+      
+      for (const sentence of sentences) {
+        const trimmed = sentence.trim();
+        if (trimmed.length === 0) continue;
+        
+        // 如果句子以冒號結尾，不要分割，繼續累積
+        if (trimmed.endsWith('：') || trimmed.endsWith(':')) {
+          currentSentence += trimmed;
+        } else {
+          if (currentSentence) {
+            result.push((currentSentence + trimmed + '。').trim());
+            currentSentence = '';
+          } else {
+            result.push((trimmed + '。').trim());
+          }
+        }
+      }
+      
+      // 處理最後的句子
+      if (currentSentence) {
+        result.push(currentSentence.trim());
+      }
+      
+      // 確保沒有空白內容
+      return result.filter(p => p.trim().length > 0).length > 0 ? result.filter(p => p.trim().length > 0) : [text.trim()];
     }
 
-    // 如果太長，強制分割
-    if (text.length > 200) {
+    // 如果太長（超過500字），強制分割
+    if (text.length > 500) {
       const midPoint = Math.floor(text.length / 2);
       const splitPoint = text.lastIndexOf('。', midPoint) || text.lastIndexOf('，', midPoint) || midPoint;
       
@@ -241,14 +376,6 @@ export class ChatProxyService {
   }
 
   /**
-   * 構造語音生成訊息（chat-say 模式）
-   */
-  private buildSpeechMessage(text: string): string {
-    // 使用配置的模板，替換 {{TEXT}} 占位符
-    return config.ttsUserTemplate.replace('{{TEXT}}', text);
-  }
-
-  /**
    * 重置聊天會話
    */
   resetChatSession(): void {
@@ -262,6 +389,23 @@ export class ChatProxyService {
   setDefaultCharacterId(characterId: string): void {
     this.defaultCharacterId = characterId;
     logger.info('Default character ID updated', { characterId });
+  }
+
+  /**
+   * 獲取最新的聊天 ID
+   */
+  getLastChatIds(): { turnId: string | null; candidateId: string | null } {
+    return {
+      turnId: this.lastTurnId,
+      candidateId: this.lastCandidateId
+    };
+  }
+
+  /**
+   * 獲取 TTS 服務
+   */
+  getTTSService(): TTSService {
+    return this.ttsService;
   }
 
   /**

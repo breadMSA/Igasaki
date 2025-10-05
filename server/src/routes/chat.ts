@@ -20,9 +20,11 @@ const contentClassifier = new ContentClassifier(geminiService);
 /**
  * POST /api/chat - SSE 串流聊天 API
  */
-router.post('/chat', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
   const startTime = Date.now();
-  let requestId: string;
+  
+  // 生成請求 ID
+  const requestId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   try {
     // 設定 SSE 標頭
@@ -33,9 +35,6 @@ router.post('/chat', async (req: Request, res: Response) => {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type',
     });
-
-    // 生成請求 ID
-    requestId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // 驗證請求
     const chatRequest = validateChatRequest(req.body);
@@ -45,33 +44,18 @@ router.post('/chat', async (req: Request, res: Response) => {
     // 發送初始心跳
     sendSSEEvent(res, 'meta', { requestId, status: 'processing' });
 
-    // 第一階段：內容分類與路由
-    const classification = await contentClassifier.classifyContent(chatRequest.message);
-    
-    // 發送路由資訊
+    // 優化歷史記錄：只保留最近的對話（避免卡頓）
+    const optimizedHistory = optimizeChatHistory(chatRequest.history);
+
+    // 直接使用 Gemini，不進行內容分類
     sendSSEEvent(res, 'meta', { 
-      route: classification.action,
-      confidence: classification.confidence,
-      category: classification.category
+      route: 'gemini',
+      confidence: 1.0,
+      category: 'default'
     });
 
-    // 根據分類結果路由處理
-    switch (classification.action) {
-      case 'deny':
-        await handleDenyRoute(res, classification, requestId);
-        break;
-      
-      case 'charProxy':
-        await handleCharProxyRoute(res, chatRequest, classification, requestId);
-        break;
-      
-      case 'gemini':
-        await handleGeminiRoute(res, chatRequest, classification, requestId);
-        break;
-      
-      default:
-        throw new ValidationError(`Unknown classification action: ${classification.action}`);
-    }
+    // 直接處理為 Gemini 路由
+    await handleGeminiRoute(res, { ...chatRequest, history: optimizedHistory }, { action: 'gemini' }, requestId);
 
     // 發送完成事件
     const processingTime = Date.now() - startTime;
@@ -79,24 +63,19 @@ router.post('/chat', async (req: Request, res: Response) => {
     sendSSEEvent(res, 'done', {});
 
     logger.info(`Chat request completed [${requestId}]`, { 
-      route: classification.action, 
+      route: 'gemini', 
       processingTime 
     });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`Chat request failed [${requestId || 'unknown'}]`, { error: errorMessage });
+    logger.error(`Chat request failed [${requestId}]`, { error: errorMessage });
 
     // 發送錯誤事件
     sendSSEEvent(res, 'error', { 
-      message: error instanceof ValidationError 
-        ? errorMessage 
-        : '處理請求時發生錯誤，請稍後再試。'
+      message: error instanceof ValidationError ? errorMessage : '聊天服務暫時無法使用，請稍後再試。' 
     });
     sendSSEEvent(res, 'done', {});
-  } finally {
-    // 確保連接關閉
-    res.end();
   }
 });
 
@@ -108,11 +87,11 @@ async function handleDenyRoute(
   classification: any, 
   requestId: string
 ): Promise<void> {
-  logger.info(`Handling deny route [${requestId}]`, { category: classification.category });
-
-  const safetyMessage = contentClassifier.getSafetyDenialMessage(classification.category);
+  logger.info(`Handling deny route [${requestId}]`, { reason: classification.reason });
   
-  sendSSEEvent(res, 'utterance', { text: safetyMessage });
+  sendSSEEvent(res, 'utterance', { 
+    text: '抱歉，我無法處理這個請求。請確保內容符合使用規範。' 
+  });
 }
 
 /**
@@ -165,7 +144,8 @@ async function handleGeminiRoute(
     for await (const chunk of geminiService.generateChatResponse(
       chatRequest.message,
       chatRequest.history,
-      chatRequest.images
+      chatRequest.images,
+      chatRequest.personality
     )) {
       switch (chunk.type) {
         case 'utterance':
@@ -190,15 +170,21 @@ async function handleGeminiRoute(
 }
 
 /**
- * 發送 SSE 事件
+ * 優化聊天歷史記錄，避免卡頓
  */
-function sendSSEEvent(res: Response, event: string, data: any): void {
-  try {
-    const sseData = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    res.write(sseData);
-  } catch (error) {
-    logger.error('Failed to send SSE event', { event, error: error instanceof Error ? error.message : String(error) });
+function optimizeChatHistory(history?: any[]): any[] {
+  if (!history || history.length === 0) {
+    return [];
   }
+
+  // 只保留最近的 20 條訊息，避免歷史記錄過長導致卡頓
+  const maxHistoryLength = 20;
+  if (history.length <= maxHistoryLength) {
+    return history;
+  }
+
+  logger.debug(`Optimizing chat history: ${history.length} -> ${maxHistoryLength} messages`);
+  return history.slice(-maxHistoryLength);
 }
 
 /**
@@ -217,44 +203,55 @@ function validateChatRequest(body: any): ChatRequest {
     throw new ValidationError('Message cannot be empty');
   }
 
-  if (body.message.length > 10000) {
-    throw new ValidationError('Message is too long (max 10000 characters)');
-  }
+      // 移除長度限制，允許記憶注入的長消息
 
-  // 驗證可選欄位
-  if (body.images && !Array.isArray(body.images)) {
-    throw new ValidationError('Images must be an array');
-  }
-
-  if (body.personaId && typeof body.personaId !== 'string') {
-    throw new ValidationError('PersonaId must be a string');
-  }
-
-  if (body.history && !Array.isArray(body.history)) {
-    throw new ValidationError('History must be an array');
-  }
-
-  // 驗證歷史訊息格式
-  if (body.history) {
-    for (const msg of body.history) {
-      if (!msg.role || !msg.content) {
-        throw new ValidationError('History messages must have role and content');
-      }
-      if (!['user', 'assistant'].includes(msg.role)) {
-        throw new ValidationError('History message role must be "user" or "assistant"');
-      }
-      if (typeof msg.content !== 'string') {
-        throw new ValidationError('History message content must be a string');
-      }
-    }
-  }
-
-  return {
-    message: body.message.trim(),
-    images: body.images || [],
-    personaId: body.personaId,
-    history: body.history || []
+  const request: ChatRequest = {
+    message: body.message.trim()
   };
+
+  // 可選參數
+  if (body.history !== undefined) {
+    if (!Array.isArray(body.history)) {
+      throw new ValidationError('History must be an array');
+    }
+    request.history = body.history;
+  }
+
+  if (body.images !== undefined) {
+    if (!Array.isArray(body.images)) {
+      throw new ValidationError('Images must be an array');
+    }
+    request.images = body.images;
+  }
+
+  if (body.personality !== undefined) {
+    if (typeof body.personality !== 'string') {
+      throw new ValidationError('Personality must be a string');
+    }
+    request.personality = body.personality;
+  }
+
+  if (body.personaId !== undefined) {
+    if (typeof body.personaId !== 'string') {
+      throw new ValidationError('PersonaId must be a string');
+    }
+    request.personaId = body.personaId;
+  }
+
+  return request;
+}
+
+/**
+ * 發送 SSE 事件
+ */
+function sendSSEEvent(res: Response, eventType: string, data: any): void {
+  const event = {
+    type: eventType,
+    data
+  };
+
+  const eventString = `data: ${JSON.stringify(event)}\n\n`;
+  res.write(eventString);
 }
 
 /**

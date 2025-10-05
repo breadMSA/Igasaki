@@ -1,0 +1,13 @@
+{
+  "id": "default",
+  "ttsMode": "chat-say",
+  "autoplay": false,
+  "volume": 1,
+  "theme": "light",
+  "language": "zh-TW",
+  "backgroundOpacity": 0.3,
+  "live2dEnabled": true,
+  "createdAt": "2025-10-03T12:19:51.497Z",
+  "updatedAt": "2025-10-03T12:43:43.632Z",
+  "aiPersonality": "custom"
+}

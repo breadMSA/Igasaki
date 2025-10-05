@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import './utils/reloadMessages'  // 載入調試工具
 
 // 全域錯誤處理
 window.addEventListener('unhandledrejection', (event) => {

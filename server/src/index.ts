@@ -207,8 +207,6 @@ class Server {
 📊 監控端點：
    • 服務狀態： GET  http://localhost:${config.port}/health
    • API 文檔：  GET  http://localhost:${config.port}/api
-
-⚠️  請確保已設定必要的環境變數！
           `);
         }
       });

@@ -14,9 +14,9 @@ import { GeminiService } from './geminiService.js';
  */
 export class ContentClassifier {
   private geminiService: GeminiService;
-  private hardBlockPatterns: SafetyPattern[];
-  private sexualContentPatterns: SafetyPattern[];
-  private educationalPatterns: SafetyPattern[];
+  private hardBlockPatterns: SafetyPattern[] = [];
+  private sexualContentPatterns: SafetyPattern[] = [];
+  private educationalPatterns: SafetyPattern[] = [];
 
   constructor(geminiService: GeminiService) {
     this.geminiService = geminiService;

@@ -4,11 +4,23 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  conversationId?: string;
   route?: 'gemini' | 'charProxy' | 'deny';
-  utterances?: string[];
+  utterances?: Array<{
+    id: string;
+    text: string;
+    timestamp: Date;
+  }>;
   citations?: Citation[];
   attachments?: string[];
   processing?: boolean;
+  turnId?: string;
+  candidateId?: string;
+  metadata?: {
+    model?: string;
+    tokens?: number;
+    processingTime?: number;
+  };
 }
 
 export interface Citation {
@@ -21,6 +33,7 @@ export interface ChatRequest {
   message: string;
   images?: string[];
   personaId?: string;
+  personality?: string;
   history?: { role: 'user' | 'assistant'; content: string }[];
 }
 
@@ -141,6 +154,7 @@ export interface MemoryCard {
 
 export interface UserPreferences {
   id: string;
+  userName?: string;
   voiceId?: string;
   personaId?: string;
   ttsMode: 'chat-say' | 'direct';
@@ -150,6 +164,12 @@ export interface UserPreferences {
   live2dModelId?: string;
   theme: 'light' | 'dark' | 'auto';
   language: 'zh-TW' | 'en-US';
+  backgroundImage?: string;
+  backgroundOpacity?: number;
+  userAvatar?: string;
+  botAvatar?: string;
+  aiPersonality?: string;
+  customPersonalityText?: string;
   createdAt: Date;
   updatedAt: Date;
 }

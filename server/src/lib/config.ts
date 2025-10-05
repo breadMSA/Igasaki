@@ -1,8 +1,14 @@
 import { config as dotenvConfig } from 'dotenv';
 import { Config } from '@/types/index.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Load environment variables
-dotenvConfig();
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables from the project root
+dotenvConfig({ path: join(__dirname, '../../../.env') });
 
 function getEnvVar(key: string, defaultValue?: string): string {
   const value = process.env[key];
@@ -55,10 +61,16 @@ export const config: Config = {
   geminiApiKey: getEnvVar('GEMINI_API_KEY'),
 
   // Chat Proxy
-  chatProxyUrl: getEnvVar('CHAT_PROXY_URL'),
+  chatProxyUrl: getEnvVarOptional('CHAT_PROXY_URL'),
   chatProxyApiKey: getEnvVarOptional('CHAT_PROXY_API_KEY'),
-  chatProxyChatPath: getEnvVar('CHAT_PROXY_CHAT_PATH', '/v1/chat'),
+  chatProxyChatPath: getEnvVarOptional('CHAT_PROXY_CHAT_PATH', '/v1/chat'),
   chatProxyVoiceId: getEnvVarOptional('CHAT_PROXY_VOICE_ID'),
+  
+  // Character.AI Direct Integration
+  characterAIToken: getEnvVarOptional('CHARACTERAI_TOKEN'),
+  characterAICharacterId: getEnvVarOptional('CHARACTERAI_CHARACTER_ID'),
+  characterAIChatId: getEnvVarOptional('CHARACTERAI_CHAT_ID'),
+  characterAIVoiceId: getEnvVarOptional('VOICE_ID'),
 
   // TTS
   ttsMode: getEnvVar('TTS_MODE', 'chat-say'),
@@ -75,8 +87,7 @@ export const config: Config = {
 // Validate required configuration
 export function validateConfig(): void {
   const requiredFields: (keyof Config)[] = [
-    'geminiApiKey',
-    'chatProxyUrl'
+    'geminiApiKey'
   ];
 
   for (const field of requiredFields) {
@@ -85,11 +96,13 @@ export function validateConfig(): void {
     }
   }
 
-  // Validate URLs
-  try {
-    new URL(config.chatProxyUrl);
-  } catch (error) {
-    throw new Error(`Invalid CHAT_PROXY_URL: ${config.chatProxyUrl}`);
+  // Validate URLs if chat proxy is configured
+  if (config.chatProxyUrl) {
+    try {
+      new URL(config.chatProxyUrl);
+    } catch (error) {
+      throw new Error(`Invalid CHAT_PROXY_URL: ${config.chatProxyUrl}`);
+    }
   }
 
   try {

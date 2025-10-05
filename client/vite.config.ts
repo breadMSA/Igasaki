@@ -38,6 +38,7 @@ export default defineConfig({
   define: {
     // Define global constants
     __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
+    'import.meta.env': JSON.stringify(process.env),
   },
   optimizeDeps: {
     include: [

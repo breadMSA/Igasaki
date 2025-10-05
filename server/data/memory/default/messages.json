@@ -1,0 +1,200 @@
+[
+  {
+    "id": "msg_1759556209505_6w50ng0q2",
+    "role": "user",
+    "content": "嗨嗨",
+    "timestamp": "2025-10-04T05:36:49.375Z",
+    "attachments": []
+  },
+  {
+    "id": "msg_1759556211878_0yw5pbym5",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:36:51.782Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true
+  },
+  {
+    "id": "msg_1759556211901_tltwox1at",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:36:51.782Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true,
+    "route": "gemini"
+  },
+  {
+    "id": "msg_1759556211920_3r6kcrjo8",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:36:51.782Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true,
+    "route": "gemini"
+  },
+  {
+    "id": "msg_1759556213635_gf2nuougu",
+    "role": "assistant",
+    "content": "哈囉！嗨嗨！我是 Igasaki，很高興為你服務喔！😊 有什麼我可以幫忙的嗎？",
+    "timestamp": "2025-10-04T05:36:51.782Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true
+  },
+  {
+    "id": "msg_1759556213689_n0n7vaeor",
+    "role": "assistant",
+    "content": "哈囉！嗨嗨！我是 Igasaki，很高興為你服務喔！😊 有什麼我可以幫忙的嗎？",
+    "timestamp": "2025-10-04T05:36:51.782Z",
+    "utterances": [],
+    "citations": [],
+    "processing": false
+  },
+  {
+    "id": "msg_1759556213764_hconzuvr9",
+    "role": "assistant",
+    "content": "哈囉！嗨嗨！我是 Igasaki，很高興為你服務喔！😊 有什麼我可以幫忙的嗎？",
+    "timestamp": "2025-10-04T05:36:51.782Z",
+    "utterances": [],
+    "citations": [],
+    "processing": false
+  },
+  {
+    "id": "msg_1759556231659_07ehyyz71",
+    "role": "user",
+    "content": "可以幫我查一下現在日本東京的天氣嗎？",
+    "timestamp": "2025-10-04T05:37:11.549Z",
+    "attachments": []
+  },
+  {
+    "id": "msg_1759556233771_ajd8sevkw",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:37:13.651Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true
+  },
+  {
+    "id": "msg_1759556233803_6fxj2yyni",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:37:13.651Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true,
+    "route": "gemini"
+  },
+  {
+    "id": "msg_1759556233847_1935b67st",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:37:13.651Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true,
+    "route": "gemini"
+  },
+  {
+    "id": "msg_1759556237258_aakzlou6t",
+    "role": "assistant",
+    "content": "東京現在的天氣是陰雨綿綿喔！氣溫大約在攝氏21度左右，感覺起來也是21度，濕度還蠻高的，有94%呢。\n\n今天（10月4日）白天東京會是多雲的天氣，降雨機率有",
+    "timestamp": "2025-10-04T05:37:13.651Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true,
+    "route": "gemini"
+  },
+  {
+    "id": "msg_1759556237609_5dxxfye66",
+    "role": "assistant",
+    "content": "東京現在的天氣是陰雨綿綿喔！氣溫大約在攝氏21度左右，感覺起來也是21度，濕度還蠻高的，有94%呢。\n\n今天（10月4日）白天東京會是多雲的天氣，降雨機率有80%，氣溫會在攝氏21到24度之間。 晚上則沒有特別提到，但預計濕度會維持在84%左右。",
+    "timestamp": "2025-10-04T05:37:13.651Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true
+  },
+  {
+    "id": "msg_1759556237645_ai2pdrlr0",
+    "role": "assistant",
+    "content": "東京現在的天氣是陰雨綿綿喔！氣溫大約在攝氏21度左右，感覺起來也是21度，濕度還蠻高的，有94%呢。\n\n今天（10月4日）白天東京會是多雲的天氣，降雨機率有80%，氣溫會在攝氏21到24度之間。 晚上則沒有特別提到，但預計濕度會維持在84%左右。",
+    "timestamp": "2025-10-04T05:37:13.651Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true
+  },
+  {
+    "id": "msg_1759556237844_fixl6xur6",
+    "role": "assistant",
+    "content": "今天（10月4日）白天東京會是多雲的天氣，降雨機率有80%，氣溫會在攝氏21到24度之間。 晚上則沒有特別提到，但預計濕度會維持在84%左右。",
+    "timestamp": "2025-10-04T05:37:17.600Z",
+    "processing": false,
+    "citations": []
+  },
+  {
+    "id": "msg_1759556251572_veskr56zy",
+    "role": "user",
+    "content": "謝謝你，你真厲害",
+    "timestamp": "2025-10-04T05:37:31.474Z",
+    "attachments": []
+  },
+  {
+    "id": "msg_1759556253229_3y9x4c85q",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:37:33.124Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true
+  },
+  {
+    "id": "msg_1759556253260_symey9kzz",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:37:33.124Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true,
+    "route": "gemini"
+  },
+  {
+    "id": "msg_1759556253298_ewxdqygny",
+    "role": "assistant",
+    "content": "",
+    "timestamp": "2025-10-04T05:37:33.124Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true,
+    "route": "gemini"
+  },
+  {
+    "id": "msg_1759556255755_e0wmltd6o",
+    "role": "assistant",
+    "content": "謝謝你的稱讚！聽到你覺得我厲害，真的讓我很開心呢！😊 我會繼續努力，希望能幫上你更多忙喔！",
+    "timestamp": "2025-10-04T05:37:33.124Z",
+    "utterances": [],
+    "citations": [],
+    "processing": true
+  },
+  {
+    "id": "msg_1759556255831_x8qgq8oza",
+    "role": "assistant",
+    "content": "謝謝你的稱讚！聽到你覺得我厲害，真的讓我很開心呢！😊 我會繼續努力，希望能幫上你更多忙喔！",
+    "timestamp": "2025-10-04T05:37:33.124Z",
+    "utterances": [],
+    "citations": [],
+    "processing": false
+  },
+  {
+    "id": "msg_1759556255973_tr50yodyu",
+    "role": "assistant",
+    "content": "謝謝你的稱讚！聽到你覺得我厲害，真的讓我很開心呢！😊 我會繼續努力，希望能幫上你更多忙喔！",
+    "timestamp": "2025-10-04T05:37:33.124Z",
+    "utterances": [],
+    "citations": [],
+    "processing": false
+  }
+]

@@ -30,5 +30,9 @@
     "character-ai"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "pixi-live2d-display": "^0.5.0-beta",
+    "pixi.js": "^7.0.0"
+  }
 }

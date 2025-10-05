@@ -1,3 +1,8 @@
+import axios from 'axios';
+import { spawn } from 'child_process';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { readFileSync, existsSync } from 'fs';
 import { 
   TTSRequest, 
   VoiceInfo, 
@@ -7,17 +12,21 @@ import {
 import { config } from '@/lib/config.js';
 import { logger } from '@/lib/logger.js';
 import ChatProxyService from './chatProxyService.js';
+import CharacterAI from './characterAI.js';
 
 /**
  * TTS 服務
- * 基於 chat-say 模式，使用外部聊天代理生成語音
+ * 基於 Character.AI TTS API 生成語音
  */
 export class TTSService {
   private chatProxyService: ChatProxyService;
+  private characterAI: CharacterAI;
   private supportedFormats: Set<string> = new Set(['mp3', 'wav', 'ogg']);
 
-  constructor(chatProxyService: ChatProxyService) {
+  // 將 CharacterAI 實例作為參數傳入
+  constructor(chatProxyService: ChatProxyService, characterAI: CharacterAI) {
     this.chatProxyService = chatProxyService;
+    this.characterAI = characterAI; // 使用已經驗證的實例
   }
 
   /**
@@ -29,12 +38,6 @@ export class TTSService {
       
       logger.logSafeContent('info', 'Starting TTS generation', request.text);
 
-      // 檢查代理服務可用性
-      const isAvailable = await this.chatProxyService.checkAvailability();
-      if (!isAvailable) {
-        throw new ExternalServiceError('TTS', 'Chat proxy service is not available');
-      }
-
       // 清理並準備文字
       const cleanedText = this.prepareTextForSpeech(request.text);
       
@@ -43,16 +46,46 @@ export class TTSService {
         throw new ValidationError('Text is empty after cleaning');
       }
 
-      // 生成語音
+      // 使用 Character.AI 生成語音
+      if (config.characterAIToken) {
+        try {
+          logger.info('Generating speech via Character.AI...');
+          
+          const audioBuffer = await this.generateSpeechWithCharacterAI(cleanedText, request.voiceId);
+          
+          const mimeType = this.getMimeType(config.ttsFormat);
+          
+          logger.info('Character.AI TTS generation completed successfully', {
+            textLength: cleanedText.length,
+            audioSize: audioBuffer.length,
+            format: config.ttsFormat
+          });
+
+          return {
+            audio: audioBuffer,
+            mimeType
+          };
+        } catch (characterAIError) {
+          logger.warn('Character.AI TTS failed, falling back to chat proxy', { 
+            error: characterAIError instanceof Error ? characterAIError.message : String(characterAIError) 
+          });
+        }
+      }
+
+      // 後備：使用聊天代理服務
+      const isAvailable = await this.chatProxyService.checkAvailability();
+      if (!isAvailable) {
+        throw new ExternalServiceError('TTS', 'No TTS service available');
+      }
+
       const audioBuffer = await this.chatProxyService.generateSpeech(
         cleanedText,
         request.voiceId
       );
 
-      // 確定 MIME 類型
       const mimeType = this.getMimeType(config.ttsFormat);
 
-      logger.info('TTS generation completed successfully', {
+      logger.info('Chat proxy TTS generation completed successfully', {
         textLength: cleanedText.length,
         audioSize: audioBuffer.length,
         format: config.ttsFormat
@@ -79,12 +112,136 @@ export class TTSService {
   }
 
   /**
+   * 使用 Character.AI 生成語音（通過 Python 腳本）
+   */
+  private async generateSpeechWithCharacterAI(text: string, voiceId?: string): Promise<Buffer> {
+    try {
+      // 確保有 Character.AI Token
+      if (!config.characterAIToken) {
+        throw new ExternalServiceError('CharacterAI', 'Token not configured');
+      }
+
+      logger.info('Generating speech using Python scripts...');
+      
+      // 第一步：使用 send.py 發送消息給 Character.AI
+      const sendScript = join(process.cwd(), 'py/send.py');
+      await this.executePythonScript(sendScript, [text]);
+      
+      // 第二步：使用 speak.py 生成語音
+      const speakScript = join(process.cwd(), 'py/speak.py');
+      const audioBuffer = await this.executePythonScript(speakScript, []);
+      
+      return audioBuffer;
+      
+    } catch (error) {
+      logger.error('Character.AI speech generation failed', { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 執行 Python 腳本
+   */
+  private async executePythonScript(scriptPath: string, args: string[]): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const allArgs = [scriptPath, ...args];
+      
+      logger.info('Executing Python script:', { script: scriptPath, args });
+      
+      const pythonProcess = spawn('python', allArgs, {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      pythonProcess.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+      
+      pythonProcess.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+      
+      pythonProcess.on('close', (code: number) => {
+        if (code !== 0) {
+          logger.error('Python script failed:', { code, stderr });
+          reject(new ExternalServiceError('CharacterAI', `Python script failed: ${stderr}`));
+          return;
+        }
+        
+        try {
+          logger.info('Python script completed successfully');
+          
+          // 如果是 speak.py，嘗試讀取生成的音頻文件
+          if (scriptPath.includes('speak.py')) {
+            const audioPath = join(process.cwd(), 'bot_speech.mp3');
+            
+            if (existsSync(audioPath)) {
+              const audioBuffer = readFileSync(audioPath);
+              resolve(audioBuffer);
+            } else {
+              reject(new ExternalServiceError('CharacterAI', 'Audio file not found'));
+            }
+          } else {
+            // 對於其他腳本，返回空 Buffer
+            resolve(Buffer.from(''));
+          }
+          
+        } catch (parseError) {
+          logger.error('Failed to process Python script output:', { stdout, parseError });
+          reject(new ExternalServiceError('CharacterAI', 'Failed to process Python script output'));
+        }
+      });
+      
+      pythonProcess.on('error', (error: Error) => {
+        logger.error('Failed to execute Python script:', error);
+        reject(new ExternalServiceError('CharacterAI', `Failed to execute Python script: ${error.message}`));
+      });
+    });
+  }
+
+
+
+
+
+  /**
+   * 確保有聊天會話
+   */
+  private async ensureChatSession(): Promise<string> {
+    // 檢查是否有配置的現有聊天 ID
+    if (config.characterAIChatId) {
+      try {
+        const existingChat = await this.characterAI.getChatById(config.characterAIChatId);
+        if (existingChat) {
+          logger.info('Using existing chat session for TTS', { chatId: existingChat.chat_id });
+          return existingChat.chat_id;
+        }
+      } catch (error) {
+        logger.warn('Failed to get existing chat for TTS, creating new one', { error });
+      }
+    }
+
+    // 創建新的聊天會話
+    const characterId = config.characterAICharacterId || '7ZSNhkW6YSiCxrGweo4zoIbSKsE1unLljfLXZV2g-Xc';
+    const chatResult = await this.characterAI.createChat(characterId);
+    return chatResult.chat.chat_id;
+  }
+
+
+
+  /**
    * 獲取可用聲線
    */
   async getAvailableVoices(): Promise<VoiceInfo[]> {
     try {
       logger.debug('Fetching available voices');
 
+      // 簡化：直接使用聊天代理服務獲取語音
+
+      // 後備：使用聊天代理服務
       const voices = await this.chatProxyService.getAvailableVoices();
       
       // 轉換為標準格式
@@ -111,6 +268,12 @@ export class TTSService {
    */
   async checkAvailability(): Promise<boolean> {
     try {
+      // 如果有 Character.AI Token，直接返回 true
+      if (config.characterAIToken) {
+        return true;
+      }
+      
+      // 否則檢查聊天代理服務
       return await this.chatProxyService.checkAvailability();
     } catch (error) {
       logger.warn('TTS service availability check failed', { 

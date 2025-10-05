@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import chatRoutes from './chat.js';
 import ttsRoutes from './tts.js';
+import extractKeywordsRoutes from './extractKeywords.js';
+import vectorMemoryRoutes from './vectorMemory.js';
+import userDataRoutes from './userData.js';
 import { logger } from '@/lib/logger.js';
 
 const router = Router();
@@ -8,6 +11,9 @@ const router = Router();
 // 掛載子路由
 router.use('/chat', chatRoutes);
 router.use('/tts', ttsRoutes);
+router.use('/extract-keywords', extractKeywordsRoutes);
+router.use('/vector-memory', vectorMemoryRoutes);
+router.use('/user-data', userDataRoutes);
 
 // API 根路徑 - 基本資訊
 router.get('/', (req, res) => {
@@ -33,7 +39,12 @@ router.get('/health', async (req, res) => {
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       version: process.version,
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        gemini: !!process.env.GEMINI_API_KEY,
+        chatProxy: !!(process.env.CHARACTERAI_TOKEN || process.env.CHAT_PROXY_URL),
+        vectorMemory: !!process.env.MEMORY_API_KEY
+      }
     };
 
     res.json(health);

@@ -260,10 +260,11 @@ export function asyncHandler(
  */
 export function developmentOnly(req: Request, res: Response, next: NextFunction): void {
   if (config.nodeEnv !== 'development') {
-    return res.status(403).json({
+    res.status(403).json({
       error: '此端點僅在開發環境中可用',
       code: 'DEVELOPMENT_ONLY'
     });
+    return;
   }
   
   next();

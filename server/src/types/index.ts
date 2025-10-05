@@ -3,12 +3,14 @@ export interface ChatRequest {
   message: string;
   images?: string[];
   personaId?: string;
+  personality?: string;
   history?: ChatMessage[];
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  timestamp?: Date;
 }
 
 export interface TTSRequest {
@@ -72,6 +74,11 @@ export interface MemoryOperation {
   confidence: number;
 }
 
+export interface MemoryOperations {
+  write?: MemoryOperation[];
+  forget?: string[];
+}
+
 export interface MetaEvent {
   route: 'deny' | 'charProxy' | 'gemini';
   processingTime?: number;
@@ -125,7 +132,7 @@ export interface CharacterAICandidate {
 export interface GeminiResponse {
   utterances: string[];
   citations?: CitationEvent[];
-  memoryOps?: MemoryOperation[];
+  memoryOps?: MemoryOperations;
 }
 
 // Chat Proxy Types
@@ -158,10 +165,16 @@ export interface Config {
   geminiApiKey: string;
 
   // Chat Proxy
-  chatProxyUrl: string;
+  chatProxyUrl?: string;
   chatProxyApiKey?: string;
-  chatProxyChatPath: string;
+  chatProxyChatPath?: string;
   chatProxyVoiceId?: string;
+  
+  // Character.AI Direct Integration
+  characterAIToken?: string;
+  characterAICharacterId?: string;
+  characterAIChatId?: string;
+  characterAIVoiceId?: string;
 
   // TTS
   ttsMode: string;

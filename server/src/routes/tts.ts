@@ -12,18 +12,18 @@ const router = Router();
 
 // 服務實例
 const chatProxyService = new ChatProxyService();
-const ttsService = new TTSService(chatProxyService);
+const ttsService = chatProxyService.getTTSService();
 
 /**
  * POST /api/tts - 按需語音合成
  */
 router.post('/', async (req: Request, res: Response) => {
   const startTime = Date.now();
-  let requestId: string;
+  
+  // 生成請求 ID
+  const requestId = `tts_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   try {
-    // 生成請求 ID
-    requestId = `tts_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // 驗證請求
     const ttsRequest = validateTTSRequest(req.body);
@@ -67,7 +67,7 @@ router.post('/', async (req: Request, res: Response) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`TTS request failed [${requestId || 'unknown'}]`, { error: errorMessage });
+    logger.error(`TTS request failed [${requestId}]`, { error: errorMessage });
 
     // 根據錯誤類型回傳適當的狀態碼
     if (error instanceof ValidationError) {
@@ -117,6 +117,8 @@ router.get('/voices', async (req: Request, res: Response) => {
     });
   }
 });
+
+
 
 /**
  * GET /api/tts/health - TTS 服務健康檢查

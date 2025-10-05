@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = ["/.*", "/docs", "/tests"]
+
+
+[project]
+name = "PyCharacterAI"
+version = "2.2.47"
+description = "An unofficial asynchronous api wrapper for Character AI."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+
+authors = [{ name = "XtraF", email = "igoromarov15@gmail.com" }]
+
+maintainers = [{ name = "XtraF", email = "igoromarov15@gmail.com" }]
+
+keywords = [
+        "characterai",
+        "character",
+        "cai",
+        "ai",
+        "api",
+        "wrapper",
+        "asyncio",
+]
+
+classifiers = [
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+]
+
+dependencies = ["curl-cffi>=0.11.1"]
+
+[project.urls]
+Homepage = "https://github.com/Xtr4F/PyCharacterAI"
+Documentation = "https://github.com/Xtr4F/PyCharacterAI/blob/main/docs/welcome.md"
+Repository = "https://github.com/Xtr4F/PyCharacterAI.git"
+Issues = "https://github.com/Xtr4F/PyCharacterAI/issues"
+
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+# Avoid enforcing line-length violations (`E501`)
+ignore = ["E501"]
+
+[tool.uv.workspace]
+members = [
+    "tests",
+]

@@ -37,33 +37,71 @@ body {
 
 /* 自定義滾動條 */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 4px;
   transition: background-color var(--transition-fast);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(156, 163, 175, 0.7);
 }
 
 ::-webkit-scrollbar-corner {
-  background: #f1f5f9;
+  background: transparent;
 }
 
 /* Firefox 滾動條 */
 html {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f1f5f9;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+
+/* 深色模式滾動條 */
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: rgba(75, 85, 99, 0.4);
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(75, 85, 99, 0.7);
+  }
+  
+  html {
+    scrollbar-color: rgba(75, 85, 99, 0.4) transparent;
+  }
+}
+
+/* 聊天區域的滾動條 */
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.3);
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(55, 65, 81, 0.3);
+  }
+  
+  .chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(55, 65, 81, 0.6);
+  }
 }
 
 /* 焦點樣式 */

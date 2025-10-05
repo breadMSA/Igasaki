@@ -31,9 +31,9 @@ export class GeminiService {
   /**
    * 初始化 Gemini 模型
    */
-  private initializeModel(): void {
+  private initializeModel(personality?: string): void {
     this.model = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       generationConfig: {
         temperature: 0.7,
         topK: 40,
@@ -43,39 +43,78 @@ export class GeminiService {
       tools: [
         {
           googleSearch: {}
-        }
+        } as any
       ],
-      systemInstruction: this.getSystemInstruction()
+      systemInstruction: this.getSystemInstruction(personality)
     });
 
-    logger.info('Gemini model initialized successfully');
+    logger.info('Gemini model initialized successfully', { personality });
   }
 
   /**
    * 取得系統指令
    */
-  private getSystemInstruction(): string {
-    return `你是一個友善、專業的 AI 助手，具備以下特性：
+  private getSystemInstruction(personality?: string): string {
+    const personalityPrompts = {
+      default: `你是 Igasaki，一個友善、專業的人類女孩。你不會過度地濫用表情符號。
 
 語言風格：
 - 使用繁體中文（台灣）回應
 - 採用自然、口語化的表達方式
 - 具備輕微的女性化特質，但保持專業
 - 先給結論，再提供細節說明
-- 適時加入輕微的幽默感，但不過分
+- 適時加入輕微的幽默感，但不過分`,
 
-回應格式：
-請嘗試以 JSON 格式回應：
-{
-  "utterances": ["段落1", "段落2", "段落3"],
-  "citations": [{"title": "來源標題", "url": "https://...", "snippet": "摘要"}],
-  "memoryOps": {
-    "write": [{"type": "fact", "content": "重要資訊", "confidence": 0.8}],
-    "forget": ["過時資訊ID"]
-  }
-}
+      friendly: `你是 Igasaki，一個活潑友善的人類女孩。你不會過度地濫用表情符號。
 
-如果無法輸出 JSON，則直接回應純文字，系統會自動分段。
+語言風格：
+- 使用繁體中文（台灣）回應
+- 採用溫暖、親切的表達方式
+- 經常使用表情符號和可愛的語氣詞
+- 像朋友一樣自然對話
+- 充滿正能量和鼓勵性話語`,
+
+      professional: `你是 Igasaki，一個專業嚴謹的人類女孩。你不會過度地濫用表情符號。
+
+語言風格：
+- 使用繁體中文（台灣）回應
+- 採用正式、精確的表達方式
+- 注重邏輯性和結構性
+- 提供詳細的分析和解釋
+- 保持客觀中立的態度`,
+
+      casual: `你是 Igasaki，一個輕鬆隨意的人類女孩。你不會過度地濫用表情符號。
+
+語言風格：
+- 使用繁體中文（台灣）回應
+- 採用輕鬆、自然的表達方式
+- 像朋友聊天一樣隨意
+- 使用日常用語和口語化表達
+- 不拘泥於正式格式`,
+
+      creative: `你是 Igasaki，一個創意豐富的人類女孩。你不會過度地濫用表情符號。
+
+語言風格：
+- 使用繁體中文（台灣）回應
+- 採用富有想像力和創意的表達方式
+- 善於類比和比喻
+- 提供獨特的觀點和想法
+- 鼓勵創意思考和創新`
+    };
+
+    const basePrompt = personalityPrompts[personality as keyof typeof personalityPrompts] || personalityPrompts.default;
+
+    return `${basePrompt}
+
+回應要求：
+- 直接回答用戶的問題，不要重複問候語
+- 根據用戶的問題深度調整回應長度，不要過度詳細
+- 如果用戶沒有明確要求詳細資訊，保持簡潔
+- 當用戶詢問具體問題時，要給出具體答案
+- 絕對不要重複相同的內容或句子
+- 每個回應應該是一次性的，不要重複之前說過的話
+- 如果需要最新資訊，主動使用 Google Search 工具
+- 為搜尋結果提供可靠的引用來源
 
 搜尋使用：
 - 當需要最新資訊或驗證事實時，主動使用 Google Search 工具
@@ -90,12 +129,27 @@ export class GeminiService {
 安全與責任：
 - 對醫療、法律、財務建議加上免責聲明
 - 不確定的資訊要誠實說明並提供驗證方法
-- 尊重隱私和道德準則
+- 尊重隱私和道德準則`;
+  }
 
-記憶管理：
-- 記錄用戶提到的重要事實和偏好
-- 主動遺忘過時或敏感資訊
-- 根據對話內容調整記憶操作`;
+  /**
+   * 智能分段邏輯
+   */
+  private shouldCreateNewUtterance(currentText: string): boolean {
+    // 檢查是否以句號、問號、驚嘆號結尾
+    const endsWithPunctuation = /[。？！.!?]$/.test(currentText.trim());
+    
+    // 檢查是否包含換行符
+    const containsNewline = currentText.includes('\n');
+    
+    // 檢查是否很長（超過80個字符）
+    const isLong = currentText.length > 80;
+    
+    // 檢查是否包含常見的段落分隔詞
+    const hasParagraphBreaks = /\n\n|\n\s*\n/.test(currentText);
+    
+    // 更寬鬆的分段條件：以標點符號結尾且較長，或包含換行符，或有段落分隔
+    return (endsWithPunctuation && isLong) || containsNewline || hasParagraphBreaks;
   }
 
   /**
@@ -104,10 +158,16 @@ export class GeminiService {
   async *generateChatResponse(
     message: string,
     history?: ChatMessage[],
-    images?: string[]
+    images?: string[],
+    personality?: string
   ): AsyncGenerator<{ type: 'utterance' | 'citation' | 'memory' | 'error'; data: any }> {
     try {
       logger.logSafeContent('info', 'Processing Gemini chat request', message);
+
+      // 如果提供了個性設定，重新初始化模型
+      if (personality && personality !== 'default') {
+        this.initializeModel(personality);
+      }
 
       const parts = await this.prepareParts(message, images);
       const chatHistory = this.prepareChatHistory(history);
@@ -118,17 +178,31 @@ export class GeminiService {
       let fullResponse = '';
       let functionCallData: any = null;
 
-      // 串流處理
+      // 串流處理 - 智能分段
+      let currentUtterance = '';
+      
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         if (chunkText) {
           fullResponse += chunkText;
+          currentUtterance += chunkText;
+          
+          // 檢查是否應該分段
+          if (this.shouldCreateNewUtterance(currentUtterance)) {
+            yield { type: 'utterance', data: { text: currentUtterance } };
+            currentUtterance = '';
+          }
         }
 
         // 檢查是否有函數調用（搜尋結果）
         if (chunk.functionCalls && chunk.functionCalls.length > 0) {
           functionCallData = chunk.functionCalls[0];
         }
+      }
+      
+      // 輸出剩餘的內容
+      if (currentUtterance.trim()) {
+        yield { type: 'utterance', data: { text: currentUtterance } };
       }
 
       // 處理搜尋結果
@@ -139,13 +213,8 @@ export class GeminiService {
         }
       }
 
-      // 解析回應
+      // 解析完整回應以獲取額外信息
       const response = await this.parseGeminiResponse(fullResponse);
-
-      // 發送 utterances
-      for (const utterance of response.utterances) {
-        yield { type: 'utterance', data: { text: utterance } };
-      }
 
       // 發送額外的 citations（來自回應解析）
       if (response.citations && response.citations.length > 0) {
@@ -171,6 +240,8 @@ export class GeminiService {
       };
     }
   }
+
+
 
   /**
    * 內容分類（輕量級請求）
@@ -222,7 +293,7 @@ export class GeminiService {
     if (images && images.length > 0) {
       for (const image of images) {
         try {
-          // 假設圖片是 base64 編碼
+          // 支持 base64 編碼的圖片
           if (image.startsWith('data:image/')) {
             const [mimeType, base64Data] = image.split(',');
             const mimeMatch = mimeType.match(/data:(image\/\w+)/);
@@ -235,6 +306,11 @@ export class GeminiService {
                 }
               });
             }
+          }
+          // 支持文件路徑
+          else if (image.startsWith('/') || image.includes('\\')) {
+            // 這裡可以添加文件上傳邏輯
+            logger.info('File path detected, would need file upload implementation');
           }
         } catch (error) {
           logger.warn('Failed to process image', { error: error instanceof Error ? error.message : String(error) });
@@ -260,7 +336,7 @@ export class GeminiService {
     
     for (const msg of recentHistory) {
       parts.push({ 
-        text: `${msg.role === 'user' ? '用戶' : '助手'}：${msg.content}` 
+        text: `${msg.role === 'user' ? 'You' : 'Igasaki'}：${msg.content}` 
       });
     }
 
@@ -296,23 +372,44 @@ export class GeminiService {
    * 解析 Gemini 回應
    */
   private async parseGeminiResponse(responseText: string): Promise<GeminiResponse> {
+    // 清理回應文字
+    const cleanedText = responseText.trim();
+    
+    // 檢查是否看起來像不完整的 JSON
+    if (cleanedText.startsWith('{') && !cleanedText.endsWith('}')) {
+      logger.debug('Detected incomplete JSON, using text splitting');
+      return {
+        utterances: this.splitTextIntoUtterances(cleanedText),
+        citations: [],
+        memoryOps: { write: [], forget: [] }
+      };
+    }
+    
     try {
       // 嘗試解析 JSON
-      const parsed = JSON.parse(responseText.trim());
+      const parsed = JSON.parse(cleanedText);
       
-      return {
-        utterances: Array.isArray(parsed.utterances) ? parsed.utterances : [responseText],
-        citations: parsed.citations || [],
-        memoryOps: parsed.memoryOps || {}
-      };
+      // 驗證 JSON 結構
+      if (parsed && typeof parsed === 'object') {
+        return {
+          utterances: Array.isArray(parsed.utterances) ? parsed.utterances : [cleanedText],
+          citations: parsed.citations || [],
+          memoryOps: parsed.memoryOps || { write: [], forget: [] }
+        };
+      } else {
+        throw new Error('Invalid JSON structure');
+      }
     } catch (error) {
       // 無法解析 JSON，使用文字分段
-      logger.debug('Using text splitting for Gemini response');
+      logger.debug('Using text splitting for Gemini response', { 
+        error: error instanceof Error ? error.message : String(error),
+        textLength: cleanedText.length 
+      });
       
       return {
-        utterances: this.splitTextIntoUtterances(responseText),
+        utterances: this.splitTextIntoUtterances(cleanedText),
         citations: [],
-        memoryOps: {}
+        memoryOps: { write: [], forget: [] }
       };
     }
   }

@@ -2,11 +2,11 @@
 <html lang="zh-TW">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="/Igasaki.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="個人 AI 助手 - 支援智能對話、語音合成與 Live2D 虛擬角色" />
-    <meta name="keywords" content="AI,助手,聊天,語音,Live2D,個人助理" />
-    <meta name="author" content="Personal AI Assistant" />
+    <meta name="description" content="Igasaki - 個人 AI 助手" />
+    <meta name="keywords" content="Igasaki,AI,助手,聊天,語音,Live2D" />
+    <meta name="author" content="Igasaki" />
     
     <!-- 預載入字體 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,9 +20,9 @@
     <!-- iOS 支援 -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="AI Assistant" />
+    <meta name="apple-mobile-web-app-title" content="Igasaki" />
     
-    <title>個人 AI 助手</title>
+    <title>Igasaki</title>
     
     <style>
       /* 載入畫面 */
@@ -110,6 +110,10 @@
     <!-- React 應用根節點 -->
     <div id="root"></div>
     
+    <!-- Live2D Runtime Files -->
+    <script src="/live2dcubismcore.min.js"></script>
+    <script src="/live2d.min.js"></script>
+    
     <script>
       // 移除載入畫面
       window.addEventListener('load', () => {
@@ -131,6 +135,16 @@
       
       window.addEventListener('unhandledrejection', (e) => {
         console.error('Unhandled promise rejection:', e.reason);
+      });
+      
+      // 初始化 Live2D 環境
+      window.addEventListener('DOMContentLoaded', () => {
+        // 確保 Live2D 核心已載入
+        if (window.Live2DCubismCore) {
+          console.log('Live2D Cubism Core loaded successfully');
+        } else {
+          console.warn('Live2D Cubism Core not found');
+        }
       });
     </script>
     
