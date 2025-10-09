@@ -185,16 +185,31 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
         const savedMessages = await chatMemory.getMessages(10000);
         console.log(`💬 從數據庫載入 ${savedMessages.length} 條記錄`);
         
-        // 去重（根據 ID）
-        const uniqueMessages = Array.from(
-          new Map(savedMessages.map(msg => [msg.id, msg])).values()
-        );
+        // 強力去重：根據 ID 和內容
+        const messageMap = new Map<string, ChatMessageType>();
+        const contentSet = new Set<string>();
         
-        // 清理「處理中」的消息
-        const cleanMessages = uniqueMessages.filter(msg => !msg.processing);
+        for (const msg of savedMessages) {
+          // 跳過處理中的消息
+          if (msg.processing) continue;
+          
+          // 創建內容指紋（角色 + 內容 + 時間範圍）
+          const contentFingerprint = `${msg.role}_${msg.content}_${Math.floor(new Date(msg.timestamp).getTime() / 60000)}`; // 1分鐘內算相同
+          
+          // 如果這個內容指紋已經存在，跳過
+          if (contentSet.has(contentFingerprint)) {
+            console.log(`⚠️ 發現重複消息，已跳過: ${msg.id}`);
+            continue;
+          }
+          
+          contentSet.add(contentFingerprint);
+          messageMap.set(msg.id, msg);
+        }
+        
+        const uniqueMessages = Array.from(messageMap.values());
         
         // 按時間排序
-        const sortedMessages = cleanMessages
+        const sortedMessages = uniqueMessages
           .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
           .slice(-100); // 顯示最近100條
         
@@ -494,7 +509,9 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
         message: messageWithMemory,
         images: imageUrls, // 使用已處理的圖片
         personality: preferences.aiPersonality,
-        history: contextHistory // 發送最近歷史作為上下文
+        customPersonalityText: preferences.customPersonalityText,
+        history: contextHistory, // 發送最近歷史作為上下文
+        jailbreakEnabled: preferences.jailbreakEnabled
       };
 
       const response = await fetch('/api/chat', {
@@ -525,7 +542,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      await chatMemory.saveMessage(assistantMessage);
+      // 不要在這裡保存，等完成後再保存，避免重複
 
       // 處理 SSE 串流
       const decoder = new TextDecoder();
@@ -565,7 +582,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                     ? { ...msg, content: assistantMessage.content, turnId, candidateId }
                     : msg
                 ));
-                await chatMemory.saveMessage(assistantMessage);
+                // 不要在串流過程中保存，只更新 UI
               }
             } else if (event === 'citation') {
               setMessages(prev => prev.map(msg => 
@@ -577,7 +594,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                   : msg
               ));
               assistantMessage.citations = [...(assistantMessage.citations || []), data];
-              await chatMemory.saveMessage(assistantMessage);
+              // 不要在串流過程中保存
             } else if (event === 'meta') {
               setMessages(prev => prev.map(msg => 
                 msg.id === assistantMessage.id 
@@ -588,7 +605,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                   : msg
               ));
               assistantMessage.route = data.route;
-              await chatMemory.saveMessage(assistantMessage);
+              // 不要在串流過程中保存
             } else if (event === 'error') {
               setMessages(prev => prev.map(msg => 
                 msg.id === assistantMessage.id 
@@ -610,13 +627,14 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                 if (segments.length > 1) {
                   // 如果有多個段落，創建多個消息
                   const newMessages: ChatMessageType[] = [];
+                  const baseTimestamp = new Date().getTime();
                   
                   segments.forEach((segment: string, index: number) => {
                     const segmentMessage: ChatMessageType = {
                       id: `segment_${assistantMessage.id}_${index}`,
                       role: 'assistant',
                       content: segment,
-                      timestamp: new Date(),
+                      timestamp: new Date(baseTimestamp + index), // 確保順序正確
                       processing: false,
                       turnId: assistantMessage.turnId,
                       candidateId: assistantMessage.candidateId,
@@ -1013,7 +1031,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
 
       {/* 輸入區域 */}
       <div className={`${themeClass === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t p-6`}>
-        <div className="flex items-end space-x-3">
+        <div className="flex items-center space-x-3">
           <button
             onClick={triggerFileUpload}
             className={`p-2 ${themeClass === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'} rounded-lg transition-colors duration-150`}
@@ -1050,12 +1068,10 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
             />
           </div>
 
-
-
           <button
             onClick={sendMessage}
             disabled={!inputText.trim() || isLoading || isProcessing}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 flex items-center space-x-2"
+            className="px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 flex items-center space-x-2"
           >
             <Send className="w-4 h-4" />
             <span>發送</span>

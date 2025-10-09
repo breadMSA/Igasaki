@@ -229,6 +229,45 @@ export const chatMemory = {
     await db.messages.clear();
   },
 
+  // 清理重複消息
+  async removeDuplicateMessages(): Promise<number> {
+    try {
+      const allMessages = await db.messages.toArray();
+      console.log(`🔍 檢查 ${allMessages.length} 條消息是否有重複...`);
+      
+      const messageMap = new Map<string, ChatMessage>();
+      const contentSet = new Set<string>();
+      const duplicateIds: string[] = [];
+      
+      for (const msg of allMessages) {
+        // 創建內容指紋（角色 + 內容 + 時間範圍）
+        const contentFingerprint = `${msg.role}_${msg.content}_${Math.floor(new Date(msg.timestamp).getTime() / 60000)}`;
+        
+        // 如果這個內容指紋已經存在，標記為重複
+        if (contentSet.has(contentFingerprint)) {
+          duplicateIds.push(msg.id);
+          console.log(`⚠️ 發現重複消息: ${msg.id}`);
+        } else {
+          contentSet.add(contentFingerprint);
+          messageMap.set(msg.id, msg);
+        }
+      }
+      
+      // 刪除重複消息
+      if (duplicateIds.length > 0) {
+        await db.messages.bulkDelete(duplicateIds);
+        console.log(`🗑️ 已刪除 ${duplicateIds.length} 條重複消息`);
+      } else {
+        console.log('✅ 沒有發現重複消息');
+      }
+      
+      return duplicateIds.length;
+    } catch (error) {
+      console.error('清理重複消息失敗:', error);
+      return 0;
+    }
+  },
+
   async getMessageCount(): Promise<number> {
     return await db.messages.count();
   },
@@ -556,3 +595,13 @@ export const dbMaintenance = {
     });
   }
 };
+
+// 全局導出清理重複消息函數
+if (typeof window !== 'undefined') {
+  (window as any).removeDuplicateMessages = async () => {
+    const count = await chatMemory.removeDuplicateMessages();
+    console.log(`🧹 清理完成！刪除了 ${count} 條重複消息`);
+    console.log('🔄 請刷新頁面查看結果');
+    return count;
+  };
+}

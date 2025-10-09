@@ -376,6 +376,29 @@ export default function SettingsModal({
                     />
                   </div>
                 )}
+
+                {/* 越獄選項 */}
+                <div>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={preferences.jailbreakEnabled || false}
+                      onChange={(e) => onUpdatePreferences({ jailbreakEnabled: e.target.checked })}
+                      className="rounded border-gray-600 text-red-600 focus:ring-red-500 bg-gray-700"
+                    />
+                    <span className="ml-2 text-sm text-gray-300">啟用越獄模式</span>
+                  </label>
+                  <div className="mt-2 p-3 bg-red-900 bg-opacity-30 rounded-md">
+                    <div className="flex items-start space-x-2">
+                      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-red-200">
+                        <p className="font-medium mb-1">⚠️ 警告：</p>
+                        <p>啟用此選項將移除 AI 的內容限制。請謹慎使用，並對自己的行為負責。</p>
+                        <p className="mt-1">此功能僅供測試和研究用途。</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

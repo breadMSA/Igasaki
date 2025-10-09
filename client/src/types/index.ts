@@ -34,7 +34,9 @@ export interface ChatRequest {
   images?: string[];
   personaId?: string;
   personality?: string;
+  customPersonalityText?: string;
   history?: { role: 'user' | 'assistant'; content: string }[];
+  jailbreakEnabled?: boolean;
 }
 
 export interface TTSRequest {
@@ -170,6 +172,7 @@ export interface UserPreferences {
   botAvatar?: string;
   aiPersonality?: string;
   customPersonalityText?: string;
+  jailbreakEnabled?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

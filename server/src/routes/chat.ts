@@ -145,7 +145,9 @@ async function handleGeminiRoute(
       chatRequest.message,
       chatRequest.history,
       chatRequest.images,
-      chatRequest.personality
+      chatRequest.personality,
+      chatRequest.customPersonalityText,
+      chatRequest.jailbreakEnabled
     )) {
       switch (chunk.type) {
         case 'utterance':
@@ -236,6 +238,20 @@ function validateChatRequest(body: any): ChatRequest {
       throw new ValidationError('PersonaId must be a string');
     }
     request.personaId = body.personaId;
+  }
+
+  if (body.jailbreakEnabled !== undefined) {
+    if (typeof body.jailbreakEnabled !== 'boolean') {
+      throw new ValidationError('JailbreakEnabled must be a boolean');
+    }
+    request.jailbreakEnabled = body.jailbreakEnabled;
+  }
+
+  if (body.customPersonalityText !== undefined) {
+    if (typeof body.customPersonalityText !== 'string') {
+      throw new ValidationError('CustomPersonalityText must be a string');
+    }
+    request.customPersonalityText = body.customPersonalityText;
   }
 
   return request;

@@ -4,7 +4,9 @@ export interface ChatRequest {
   images?: string[];
   personaId?: string;
   personality?: string;
+  customPersonalityText?: string;
   history?: ChatMessage[];
+  jailbreakEnabled?: boolean;
 }
 
 export interface ChatMessage {
