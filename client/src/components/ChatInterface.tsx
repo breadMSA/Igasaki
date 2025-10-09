@@ -618,6 +618,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
               ));
               assistantMessage.content = assistantMessage.content || `錯誤：${data.message}`;
               assistantMessage.processing = false;
+              // 錯誤時也要保存
               await chatMemory.saveMessage(assistantMessage);
             } else if (event === 'done') {
               // 生成完成後進行智能分段
@@ -634,7 +635,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                       id: `segment_${assistantMessage.id}_${index}`,
                       role: 'assistant',
                       content: segment,
-                      timestamp: new Date(baseTimestamp + index), // 確保順序正確
+                      timestamp: new Date(baseTimestamp + index),
                       processing: false,
                       turnId: assistantMessage.turnId,
                       candidateId: assistantMessage.candidateId,
@@ -650,8 +651,10 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                     return [...filtered, ...newMessages];
                   });
                   
-                  // 從記憶庫中刪除原始消息，保存分段後的消息
+                  // ========== 關鍵修復：先刪除原始消息，再保存分段消息 ==========
                   await chatMemory.deleteMessage(assistantMessage.id);
+                  
+                  // 批量保存所有分段（一次性操作）
                   for (const segmentMessage of newMessages) {
                     await chatMemory.saveMessage(segmentMessage);
                   }
