@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, AlertCircle, User, Bot, RefreshCw } from 'lucide-react';
-import { UserPreferences, ServiceStatus } from '@/types';
+import { X, Check, AlertCircle, User, Bot, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
+import { UserPreferences, ServiceStatus, Conversation } from '@/types';
 import { avatarMemory } from '@/hooks/useMemoryStore';
-import { scanModels, ScannedModel } from '@/utils/modelScanner';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -10,6 +9,8 @@ interface SettingsModalProps {
   preferences: UserPreferences;
   onUpdatePreferences: (updates: Partial<UserPreferences>) => void;
   serviceStatus: ServiceStatus;
+  currentConversation?: Conversation | null;
+  onUpdateConversationSettings?: (id: string, settings: { sharedMemory: boolean }) => void;
 }
 
 export default function SettingsModal({ 
@@ -17,28 +18,18 @@ export default function SettingsModal({
   onClose, 
   preferences, 
   onUpdatePreferences, 
-  serviceStatus 
+  serviceStatus,
+  currentConversation,
+  onUpdateConversationSettings
 }: SettingsModalProps) {
-  const [scannedModels, setScannedModels] = useState<ScannedModel[]>([]);
-  const [isScanning, setIsScanning] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'conversation'>('general');
+  const [sharedMemory, setSharedMemory] = useState(currentConversation?.settings.sharedMemory ?? true);
 
   useEffect(() => {
-    if (isOpen) {
-      scanAvailableModels();
+    if (currentConversation) {
+      setSharedMemory(currentConversation.settings.sharedMemory);
     }
-  }, [isOpen]);
-
-  const scanAvailableModels = async () => {
-    setIsScanning(true);
-    try {
-      const models = await scanModels();
-      setScannedModels(models);
-    } catch (error) {
-      console.error('掃描模型失敗:', error);
-    } finally {
-      setIsScanning(false);
-    }
-  };
+  }, [currentConversation]);
 
   if (!isOpen) return null;
 
@@ -59,6 +50,39 @@ export default function SettingsModal({
     }
   };
 
+  const handleSaveConversationSettings = async () => {
+    if (currentConversation && onUpdateConversationSettings) {
+      await onUpdateConversationSettings(currentConversation.id, { sharedMemory });
+      onClose(); // 儲存後關閉介面
+    }
+  };
+
+  // 開關組件
+  const ToggleSwitch = ({ 
+    checked, 
+    onChange, 
+    disabled = false 
+  }: { 
+    checked: boolean; 
+    onChange: (checked: boolean) => void; 
+    disabled?: boolean;
+  }) => (
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+        checked ? 'bg-blue-600' : 'bg-gray-200'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
+          checked ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </button>
+  );
+
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
@@ -66,7 +90,7 @@ export default function SettingsModal({
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-screen overflow-y-auto">
+      <div className="bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-screen overflow-y-auto">
         <form onSubmit={handleSubmit}>
           {/* 標題 */}
           <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
@@ -80,8 +104,40 @@ export default function SettingsModal({
             </button>
           </div>
 
+          {/* 標籤頁導航 */}
+          <div className="px-6 py-3 border-b border-gray-700">
+            <div className="flex space-x-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('general')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
+                  activeTab === 'general'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+              >
+                <SettingsIcon className="w-4 h-4 inline mr-2" />
+                一般設定
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('conversation')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
+                  activeTab === 'conversation'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 inline mr-2" />
+                對話設定
+              </button>
+            </div>
+          </div>
+
           {/* 內容 */}
           <div className="px-6 py-4 space-y-6">
+            {activeTab === 'general' && (
+              <>
             {/* 服務狀態 */}
             <div>
               <h3 className="text-sm font-medium text-gray-200 mb-3">服務狀態</h3>
@@ -168,16 +224,19 @@ export default function SettingsModal({
             <div>
               <h3 className="text-sm font-medium text-gray-200 mb-3">語音設定</h3>
               <div className="space-y-4">
-                <div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={preferences.autoplay}
-                      onChange={(e) => onUpdatePreferences({ autoplay: e.target.checked })}
-                      className="rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-300">自動播放語音</span>
-                  </label>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm text-white">
+                      自動播放語音
+                    </div>
+                    <div className="text-xs mt-1 text-gray-400">
+                      收到回覆時自動播放語音
+                    </div>
+                  </div>
+                  <ToggleSwitch
+                    checked={preferences.autoplay}
+                    onChange={(checked) => onUpdatePreferences({ autoplay: checked })}
+                  />
                 </div>
 
                 <div>
@@ -206,16 +265,19 @@ export default function SettingsModal({
             <div>
               <h3 className="text-sm font-medium text-gray-200 mb-3">動畫模型設定</h3>
               <div className="space-y-4">
-                <div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={preferences.live2dEnabled}
-                      onChange={(e) => onUpdatePreferences({ live2dEnabled: e.target.checked })}
-                      className="rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-300">啟用動畫模型顯示</span>
-                  </label>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm text-white">
+                      啟用動畫模型顯示
+                    </div>
+                    <div className="text-xs mt-1 text-gray-400">
+                      顯示 Live2D 或 VRM 動畫模型
+                    </div>
+                  </div>
+                  <ToggleSwitch
+                    checked={preferences.live2dEnabled}
+                    onChange={(checked) => onUpdatePreferences({ live2dEnabled: checked })}
+                  />
                 </div>
 
                 {preferences.live2dEnabled && (
@@ -377,28 +439,6 @@ export default function SettingsModal({
                   </div>
                 )}
 
-                {/* 越獄選項 */}
-                <div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={preferences.jailbreakEnabled || false}
-                      onChange={(e) => onUpdatePreferences({ jailbreakEnabled: e.target.checked })}
-                      className="rounded border-gray-600 text-red-600 focus:ring-red-500 bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-300">啟用越獄模式</span>
-                  </label>
-                  <div className="mt-2 p-3 bg-red-900 bg-opacity-30 rounded-md">
-                    <div className="flex items-start space-x-2">
-                      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                      <div className="text-xs text-red-200">
-                        <p className="font-medium mb-1">⚠️ 警告：</p>
-                        <p>啟用此選項將移除 AI 的內容限制。請謹慎使用，並對自己的行為負責。</p>
-                        <p className="mt-1">此功能僅供測試和研究用途。</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -531,6 +571,121 @@ export default function SettingsModal({
                 </div>
               </div>
             </div>
+              </>
+            )}
+
+            {activeTab === 'conversation' && (
+              <>
+                {/* 對話設定 */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-200 mb-3">對話設定</h3>
+                  <div className="space-y-4">
+                    {currentConversation ? (
+                      <>
+                        <div className="p-4 bg-gray-700 rounded-lg">
+                          <h4 className="text-sm font-medium text-gray-200 mb-2">
+                            當前聊天室：{currentConversation.title}
+                          </h4>
+                          <p className="text-xs text-gray-400 mb-4">
+                            建立時間：{new Date(currentConversation.createdAt).toLocaleString('zh-TW')}
+                          </p>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm text-white">
+                                共享記憶
+                              </div>
+                              <div className="text-xs mt-1 text-gray-400">
+                                {sharedMemory 
+                                  ? '此聊天室可以存取所有開啟共享記憶的聊天室內容'
+                                  : '此聊天室只能存取自己的歷史記錄，其他聊天室也無法存取此聊天室的內容'
+                                }
+                              </div>
+                            </div>
+                            <ToggleSwitch
+                              checked={sharedMemory}
+                              onChange={setSharedMemory}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-gray-700 rounded-lg">
+                          <h4 className="text-sm font-medium text-gray-200 mb-2">
+                            記憶模式說明
+                          </h4>
+                          <div className="text-xs space-y-2 text-gray-300">
+                            <div>
+                              <strong>共享記憶（開啟）：</strong>
+                                <ul className="ml-4 mt-1 space-y-1">
+                                  <li>• AI 可以存取所有開啟共享記憶的聊天室內容</li>
+                                  <li>• 適合需要連續性的對話和角色扮演</li>
+                                  <li>• AI 個性和回憶會在所有共享聊天室中保持</li>
+                                  <li>• 每個聊天室都需要個別開啟此設定</li>
+                                </ul>
+                              </div>
+                              <div>
+                                <strong>獨立記憶（關閉）：</strong>
+                                <ul className="ml-4 mt-1 space-y-1">
+                                  <li>• 此聊天室完全獨立，無法存取其他聊天室的內容</li>
+                                  <li>• 其他聊天室也無法存取此聊天室的內容</li>
+                                  <li>• 適合不同主題的討論和隱私保護</li>
+                                  <li>• 每個聊天室都需要個別設定</li>
+                                </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-4 bg-gray-700 rounded-lg text-center">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+                        <p className="text-sm text-gray-400">
+                          目前沒有活躍的聊天室
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          請先建立或選擇一個聊天室來進行設定
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 越獄設定 */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-200 mb-3">AI 行為設定</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-white">
+                          啟用越獄模式
+                        </div>
+                        <div className="text-xs mt-1 text-gray-400">
+                          移除 AI 的內容限制（請謹慎使用）
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        checked={preferences.jailbreakEnabled || false}
+                        onChange={(checked) => onUpdatePreferences({ jailbreakEnabled: checked })}
+                      />
+                    </div>
+
+                    {preferences.jailbreakEnabled && (
+                      <div className="p-3 bg-red-900 bg-opacity-30 rounded-md">
+                        <div className="flex items-start space-x-2">
+                          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                          <div className="text-xs text-red-200">
+                            <p className="font-medium mb-1">⚠️ 警告：</p>
+                            <p>啟用此選項將移除 AI 的內容限制。請謹慎使用，並對自己的行為負責。</p>
+                            <p className="mt-1">此功能僅供測試和研究用途。</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* 按鈕 */}
@@ -542,13 +697,24 @@ export default function SettingsModal({
             >
               取消
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors duration-150 flex items-center space-x-2"
-            >
-              <Check className="w-4 h-4" />
-              <span>儲存</span>
-            </button>
+            {activeTab === 'conversation' ? (
+              <button
+                type="button"
+                onClick={handleSaveConversationSettings}
+                className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors duration-150 flex items-center space-x-2"
+              >
+                <Check className="w-4 h-4" />
+                <span>儲存對話設定</span>
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors duration-150 flex items-center space-x-2"
+              >
+                <Check className="w-4 h-4" />
+                <span>儲存</span>
+              </button>
+            )}
           </div>
         </form>
       </div>

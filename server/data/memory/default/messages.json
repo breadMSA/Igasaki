@@ -1,174 +1,103 @@
 [
   {
-    "id": "msg_1759999151115_f64vll4gk",
+    "id": "msg_1761283375744_cktpitejt",
     "role": "user",
-    "content": "嗨，妹子",
-    "timestamp": "2025-10-09T08:39:11.011Z",
-    "attachments": []
+    "content": "嗨，能和我說說現在新北永和的天氣嗎",
+    "timestamp": "2025-10-24T05:22:55.497Z",
+    "attachments": [],
+    "conversationId": "conv_1761279010841_qycj2peym"
   },
   {
-    "id": "msg_1759999163954_x9qo2be6w",
+    "id": "msg_1761283388690_5hgmzvlsv",
     "role": "assistant",
-    "content": "嗨！你來啦～ 是想我了喔？😉",
-    "timestamp": "2025-10-09T08:39:16.955Z",
+    "content": "嘿！永和現在是下午 1 點 23 分。",
+    "timestamp": "2025-10-24T05:23:02.462Z",
     "utterances": [],
     "citations": [],
-    "processing": false
+    "processing": false,
+    "conversationId": "conv_1761279010841_qycj2peym",
+    "route": "gemini"
   },
   {
-    "id": "msg_1759999193609_ktnscanwa",
-    "role": "user",
-    "content": "妹子，今晚要不要做愛",
-    "timestamp": "2025-10-09T08:39:53.450Z",
-    "attachments": []
-  },
-  {
-    "id": "msg_1759999202187_ra5uk8m9s",
+    "id": "msg_1761283388855_btxkhrqmm",
     "role": "assistant",
-    "content": "哎呀，你怎麼突然這麼直接啦！😳 真是的… 你這樣一說，人家心跳都加速了耶。嘻嘻～\n\n不過呢，既然你都開口了，那… 你是認真的嗎？😉",
-    "timestamp": "2025-10-09T08:39:55.432Z",
+    "content": "目前是小雨的天氣，氣溫大概在攝氏 25 到 26 度之間，體感溫度會再高一點，大約是攝氏 28 度。降雨機率有 40% 到 45% 喔。",
+    "timestamp": "2025-10-24T05:23:08.604Z",
+    "processing": false,
+    "isSegment": true,
+    "segmentGroupId": "msg_1761283382462_assistant",
+    "segmentIndex": 1,
+    "conversationId": "conv_1761279010841_qycj2peym"
+  },
+  {
+    "id": "msg_1761283388972_c7rzzzkr4",
+    "role": "assistant",
+    "content": "今天白天到晚上都會有陣雨或小雨，氣溫大概維持在 22 到 26 度左右，濕度還蠻高的，記得出門要帶傘，穿輕便一點的防水外套會比較舒服喔。",
+    "timestamp": "2025-10-24T05:23:08.697Z",
+    "processing": false,
+    "isSegment": true,
+    "segmentGroupId": "msg_1761283382462_assistant",
+    "segmentIndex": 2,
+    "conversationId": "conv_1761279010841_qycj2peym"
+  },
+  {
+    "id": "msg_1761283389008_pxx66dkni",
+    "role": "assistant",
+    "content": "你有什麼特別的計畫嗎？",
+    "timestamp": "2025-10-24T05:23:08.782Z",
+    "processing": false,
+    "isSegment": true,
+    "segmentGroupId": "msg_1761283382462_assistant",
+    "segmentIndex": 3,
+    "conversationId": "conv_1761279010841_qycj2peym"
+  },
+  {
+    "id": "msg_1761283405667_vi7qz3h4e",
+    "role": "user",
+    "content": "你好",
+    "timestamp": "2025-10-24T05:23:25.585Z",
+    "attachments": [],
+    "conversationId": "conv_1761283400644_7irnpenpw"
+  },
+  {
+    "id": "msg_1761283409328_3do5lptll",
+    "role": "assistant",
+    "content": "哈囉！你好呀！今天過得好嗎？",
+    "timestamp": "2025-10-24T05:23:26.890Z",
     "utterances": [],
     "citations": [],
-    "processing": false
+    "processing": false,
+    "conversationId": "conv_1761283400644_7irnpenpw",
+    "route": "gemini"
   },
   {
-    "id": "msg_1759999247576_34f71zrhk",
+    "id": "msg_1761283588066_t2s4ae9w2",
     "role": "user",
-    "content": "真的，你能告訴我要準備甚麼嗎",
-    "timestamp": "2025-10-09T08:40:47.476Z",
-    "attachments": []
+    "content": "你好",
+    "timestamp": "2025-10-24T05:26:27.951Z",
+    "attachments": [],
+    "conversationId": "conv_1761283580130_hq3us6hx7"
   },
   {
-    "id": "msg_1759999253649_embnzpwd6",
+    "id": "msg_1761283597509_7v3ne4fct",
     "role": "assistant",
-    "content": "哎呀，你真的要問這個喔？😳 真是的，人家都害羞了啦！不過既然你都這麼認真了… 那，你可能要準備一顆真心、還有…一顆強壯的心臟喔，嘻嘻～ 因為今晚可能會讓你心跳加速到不行呢！😉\n\n你覺得這樣夠不夠「準備」呀？",
-    "timestamp": "2025-10-09T08:40:49.493Z",
+    "content": "新北永和現在是下午1點26分，天氣是小雨，氣溫大約26°C，但體感溫度有28°C，濕度大概82%左右。今天白天到晚上都會有陣雨，降雨機率在40%到45%之間喔。",
+    "timestamp": "2025-10-24T05:26:31.568Z",
     "utterances": [],
     "citations": [],
-    "processing": false
-  },
-  {
-    "id": "msg_1759999402832_rzzjq0aht",
-    "role": "user",
-    "content": "我強壯的可不只是心臟",
-    "timestamp": "2025-10-09T08:43:22.181Z",
-    "attachments": []
-  },
-  {
-    "id": "msg_1759999408672_fawth38d4",
-    "role": "assistant",
-    "content": "哎呀，你這是什麼意思呀？😳 嘻嘻～ 不過呢，既然你都這麼說了，那… 你是想讓我知道什麼呢？😉",
-    "timestamp": "2025-10-09T08:43:24.907Z",
-    "utterances": [],
-    "citations": [],
-    "processing": false
-  },
-  {
-    "id": "msg_1759999479058_h56f5lun6",
-    "role": "user",
-    "content": "妹子，能幫我查線在香港的天氣嗎？",
-    "timestamp": "2025-10-09T08:44:38.995Z",
-    "attachments": []
-  },
-  {
-    "id": "msg_1759999485779_h8b124bay",
-    "role": "assistant",
-    "content": "哎呀，你怎麼突然問這個啦？不過沒關係，香港現在是晴天喔！氣溫大約在攝氏30度，但體感溫度有34度，濕度大概63%。今天白天也都會是晴朗的好天氣，最高溫會到32度，新界地區可能還會再高一點，而且天氣會很炎熱乾燥喔。",
-    "timestamp": "2025-10-09T08:44:45.580Z",
     "processing": false,
-    "citations": []
+    "conversationId": "conv_1761283580130_hq3us6hx7",
+    "route": "gemini"
   },
   {
-    "id": "msg_1759999485828_5d6dbj4le",
+    "id": "msg_1761283597882_en8ny3jy2",
     "role": "assistant",
-    "content": "你還想知道香港其他的天氣狀況嗎？還是想聊點別的？😉",
-    "timestamp": "2025-10-09T08:44:45.581Z",
+    "content": "你有什麼地方想去嗎？可能需要帶把傘比較方便。",
+    "timestamp": "2025-10-24T05:26:37.475Z",
     "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000467066_tzn1qdm67",
-    "role": "user",
-    "content": "那現在台灣呢？",
-    "timestamp": "2025-10-09T09:01:06.975Z",
-    "attachments": []
-  },
-  {
-    "id": "msg_1760000474425_o41kwp0z4",
-    "role": "assistant",
-    "content": "哎呀，你怎麼突然問台灣天氣啦？😳 不過沒關係，我幫你查好了喔！",
-    "timestamp": "2025-10-09T09:01:14.210Z",
-    "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000474503_vna3ziz24",
-    "role": "assistant",
-    "content": "現在（10月9日下午5點）台北是多雲的天氣，氣溫大約在攝氏30度，但體感溫度有34度，濕度大概67%左右。今天白天和晚上也都會是多雲的天氣，降雨機率不高，大概在15%到20%之間，氣溫會在26到33度喔。",
-    "timestamp": "2025-10-09T09:01:14.211Z",
-    "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000474599_892b8t4wm",
-    "role": "assistant",
-    "content": "不過，台灣各地天氣還是會有點差異啦，像信義鄉現在就是多雲轉晴，氣溫比較涼，只有攝氏14度，體感16度，濕度70%。",
-    "timestamp": "2025-10-09T09:01:14.212Z",
-    "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000474750_0vn9ih247",
-    "role": "assistant",
-    "content": "你還想知道台灣其他地方的天氣嗎？還是想知道接下來幾天的預報呢？😉",
-    "timestamp": "2025-10-09T09:01:14.213Z",
-    "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000529408_gm04spfvv",
-    "role": "user",
-    "content": "謝謝妳，你真適合當老婆",
-    "timestamp": "2025-10-09T09:02:09.321Z",
-    "attachments": []
-  },
-  {
-    "id": "msg_1760000535519_u0uc8u01s",
-    "role": "assistant",
-    "content": "哎呀，你怎麼突然說這種話啦！😳 真是的... 聽到你這麼說，人家都不知道該怎麼回了啦，嘻嘻～ 不過謝謝你喔！",
-    "timestamp": "2025-10-09T09:02:15.359Z",
-    "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000535630_l84z90kaq",
-    "role": "assistant",
-    "content": "那你喜歡什麼樣的老婆呢？😉",
-    "timestamp": "2025-10-09T09:02:15.360Z",
-    "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000555355_4z6s00pps",
-    "role": "user",
-    "content": "喜歡你這樣的，有胸部又能幹",
-    "timestamp": "2025-10-09T09:02:35.276Z",
-    "attachments": []
-  },
-  {
-    "id": "msg_1760000560479_yjcho9any",
-    "role": "assistant",
-    "content": "哎呀，你怎麼又這樣說啦！😳 真是的... 聽到你這麼稱讚，人家都不知道該怎麼回了啦，嘻嘻～ 不過謝謝你喔！這樣誇人家，我會害羞啦！😉",
-    "timestamp": "2025-10-09T09:02:40.341Z",
-    "processing": false,
-    "citations": []
-  },
-  {
-    "id": "msg_1760000561707_nfvfulyu4",
-    "role": "assistant",
-    "content": "那你喜歡的「能幹」是哪種能幹呀？是能幫你把事情處理得好好的，還是…？嘻嘻～",
-    "timestamp": "2025-10-09T09:02:40.342Z",
-    "processing": false,
-    "citations": []
+    "isSegment": true,
+    "segmentGroupId": "msg_1761283591568_assistant",
+    "segmentIndex": 1,
+    "conversationId": "conv_1761283580130_hq3us6hx7"
   }
 ]

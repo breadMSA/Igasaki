@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { Live2DModel } from 'pixi-live2d-display/cubism4';
 import { AlertCircle, Upload } from 'lucide-react';
-import { scanModels, checkModelExists, ScannedModel } from '../utils/modelScanner';
+import { scanModels, ScannedModel } from '../utils/modelScanner';
 
 declare global {
   interface Window {

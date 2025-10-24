@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Mic, MicOff, History, Settings, Search } from 'lucide-react';
+import { Send, Paperclip, Mic, History, Search } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import ChatMessage from './ChatMessage';
 import { ChatMessage as ChatMessageType, ChatRequest } from '@/types';
 import { chatMemory, preferenceMemory } from '@/hooks/useMemoryStore';
@@ -7,14 +10,18 @@ import HistoryQuery from './HistoryQuery';
 
 interface ChatInterfaceProps {
   themeClass?: 'light' | 'dark';
+  conversationId?: string | null;
+  conversationTitle?: string;
+  conversationSettings?: {
+    sharedMemory?: boolean;
+  };
 }
 
-export default function ChatInterface({ themeClass = 'light' }: ChatInterfaceProps) {
+export default function ChatInterface({ themeClass = 'light', conversationId, conversationTitle, conversationSettings }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string>('');
   const [botAvatar, setBotAvatar] = useState<string>('');
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -23,6 +30,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
   const [showHistoryQuery, setShowHistoryQuery] = useState(false);
   const [allMessages, setAllMessages] = useState<ChatMessageType[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'current'>('all');
   const messagesPerPage = 20;
 
   // 處理圖片貼上
@@ -42,79 +50,6 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 智能分段邏輯
-  const shouldCreateNewUtterance = (currentContent: string, newText: string): boolean => {
-    // 如果當前內容為空，不創建新段落
-    if (!currentContent.trim()) return false;
-    
-    // 檢查是否以句號、問號、驚嘆號結尾
-    const endsWithPunctuation = /[。？！.!?]$/.test(currentContent.trim());
-    
-    // 檢查新文本是否以大寫字母或數字開頭（可能是新句子）
-    const startsWithCapital = /^[A-Z0-9]/.test(newText.trim());
-    
-    // 檢查新文本是否包含換行符
-    const containsNewline = newText.includes('\n');
-    
-    // 如果當前內容以標點符號結尾，且新文本以大寫字母開頭，創建新段落
-    if (endsWithPunctuation && startsWithCapital) return true;
-    
-    // 如果新文本包含換行符，創建新段落
-    if (containsNewline) return true;
-    
-    // 如果新文本很長（超過50個字符），可能是新段落
-    if (newText.length > 50) return true;
-    
-    return false;
-  };
-
-  // 智能分段函數 - 生成完成後分段
-  const splitMessageIntoSegments = (content: string): string[] => {
-    if (!content || content.trim().length === 0) {
-      return [];
-    }
-
-    // 按段落分割（雙換行）
-    const paragraphs = content.split(/\n\s*\n/);
-    
-    const segments: string[] = [];
-    
-    for (const paragraph of paragraphs) {
-      const trimmedParagraph = paragraph.trim();
-      if (trimmedParagraph.length === 0) continue;
-      
-      // 檢查段落是否很長，需要進一步分割
-      if (trimmedParagraph.length > 200) {
-        // 按句子分割長段落
-        const sentences = trimmedParagraph.split(/(?<=[。？！.!?])\s+/);
-        let currentSegment = '';
-        
-        for (const sentence of sentences) {
-          const trimmedSentence = sentence.trim();
-          if (trimmedSentence.length === 0) continue;
-          
-          // 如果當前段落加上新句子會太長，創建新段落
-          if (currentSegment.length + trimmedSentence.length > 150) {
-            if (currentSegment.length > 0) {
-              segments.push(currentSegment.trim());
-              currentSegment = '';
-            }
-          }
-          
-          currentSegment += (currentSegment ? ' ' : '') + trimmedSentence;
-        }
-        
-        if (currentSegment.length > 0) {
-          segments.push(currentSegment.trim());
-        }
-      } else {
-        // 短段落直接添加
-        segments.push(trimmedParagraph);
-      }
-    }
-    
-    return segments;
-  };
 
   // 智能提取關鍵詞函數 - 使用 AI 判斷
   const extractKeywords = async (text: string): Promise<string[]> => {
@@ -176,34 +111,36 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('💬 開始載入對話記錄...');
+        console.log('💬 開始載入對話記錄...', { conversationId });
         
         // 延遲一下，確保 IndexedDB 已經完全初始化
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // 載入消息
-        const savedMessages = await chatMemory.getMessages(10000);
-        console.log(`💬 從數據庫載入 ${savedMessages.length} 條記錄`);
+        // 載入消息 - 根據 conversationId 決定載入範圍
+        let savedMessages: ChatMessageType[] = [];
+        if (conversationId) {
+          // 載入特定對話串的訊息
+          savedMessages = await chatMemory.getMessagesByConversation(conversationId, 10000);
+          console.log(`💬 從數據庫載入對話串 ${conversationId} 的 ${savedMessages.length} 條記錄`);
+        } else {
+          // 載入所有訊息（向後相容）
+          savedMessages = await chatMemory.getMessages(10000);
+          console.log(`💬 從數據庫載入 ${savedMessages.length} 條記錄`);
+        }
         
-        // 強力去重：根據 ID 和內容
+        // 修復：去重邏輯 - 只根據 ID 去重，不要根據內容去重（避免誤刪分段消息）
         const messageMap = new Map<string, ChatMessageType>();
-        const contentSet = new Set<string>();
         
         for (const msg of savedMessages) {
           // 跳過處理中的消息
           if (msg.processing) continue;
           
-          // 創建內容指紋（角色 + 內容 + 時間範圍）
-          const contentFingerprint = `${msg.role}_${msg.content}_${Math.floor(new Date(msg.timestamp).getTime() / 60000)}`; // 1分鐘內算相同
-          
-          // 如果這個內容指紋已經存在，跳過
-          if (contentSet.has(contentFingerprint)) {
-            console.log(`⚠️ 發現重複消息，已跳過: ${msg.id}`);
-            continue;
+          // 只根據 ID 去重，保留所有分段消息
+          if (!messageMap.has(msg.id)) {
+            messageMap.set(msg.id, msg);
+          } else {
+            console.log(`⚠️ 發現重複 ID，已跳過: ${msg.id}`);
           }
-          
-          contentSet.add(contentFingerprint);
-          messageMap.set(msg.id, msg);
         }
         
         const uniqueMessages = Array.from(messageMap.values());
@@ -213,8 +150,27 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
           .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
           .slice(-100); // 顯示最近100條
         
-        setMessages(sortedMessages);
-        console.log(`💬 顯示 ${sortedMessages.length} 條對話（已去重和清理）`);
+        // 修復：保持原始分段狀態，不進行任何合併
+        // 確保分段消息保持獨立，不被合併
+        const preservedMessages = sortedMessages.map(msg => ({
+          ...msg,
+          // 確保分段消息保持獨立標識
+          isSegment: msg.isSegment || false,
+          segmentGroupId: msg.segmentGroupId || undefined,
+          segmentIndex: msg.segmentIndex || 0
+        }));
+        
+        // 重要：不要對分段消息進行任何合併處理
+        // 每個消息都保持獨立，即使它們來自同一個回應
+        setMessages(preservedMessages);
+        console.log(`💬 顯示 ${preservedMessages.length} 條對話（已去重，保持原始分段狀態，每個分段都是獨立消息）`);
+        
+        // 調試：輸出分段消息的詳細信息
+        const segments = preservedMessages.filter(m => m.isSegment);
+        console.log(`🔍 分段消息數量: ${segments.length}`);
+        segments.forEach(seg => {
+          console.log(`  - ${seg.id}: segmentIndex=${seg.segmentIndex}, groupId=${seg.segmentGroupId}`);
+        });
         
         // 從 preferences 載入頭像和設定
         const preferences = await preferenceMemory.getPreferences();
@@ -254,7 +210,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
       window.removeEventListener('avatarUpdated', handleAvatarUpdate as EventListener);
       window.removeEventListener('preferencesUpdated', handlePreferencesUpdate);
     };
-  }, []);
+  }, [conversationId]);
 
   // 自動滾動到底部
   const scrollToBottom = () => {
@@ -270,10 +226,32 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
     }
   }, [messages, shouldScrollToBottom]);
 
+  // 監聽historyFilter變化，自動重新載入歷史記錄
+  useEffect(() => {
+    if (showHistory) {
+      loadHistory();
+    }
+  }, [historyFilter, conversationId, showHistory]);
+
   // 載入歷史記錄
   const loadHistory = async () => {
     try {
-      const allSavedMessages = await chatMemory.getMessages(1000); // 載入大量消息
+      let allSavedMessages: ChatMessageType[] = [];
+      
+      if (historyFilter === 'current' && conversationId) {
+        // 只載入當前對話串的訊息
+        allSavedMessages = await chatMemory.getMessagesByConversation(conversationId, 1000);
+        // 修復：當前聊天室的歷史記錄也要從新到舊排序
+        allSavedMessages = allSavedMessages.sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        console.log(`📚 載入當前對話串 ${conversationId} 的 ${allSavedMessages.length} 條歷史記錄（新到舊排序）`);
+      } else {
+        // 載入所有訊息
+        allSavedMessages = await chatMemory.getMessages(1000);
+        console.log(`📚 載入所有 ${allSavedMessages.length} 條歷史記錄`);
+      }
+      
       setAllMessages(allSavedMessages);
       setShowHistory(true);
     } catch (error) {
@@ -325,7 +303,8 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
       role: 'user',
       content: inputText.trim(),
       timestamp: new Date(),
-      attachments: imageUrls // 保存圖片附件
+      attachments: imageUrls, // 保存圖片附件
+      conversationId: conversationId || undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -350,9 +329,30 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
           console.log('🧠 向量搜尋服務可用，開始搜尋...');
           
           // 嘗試使用向量搜尋
-          // 獲取真正的聊天記錄，包括所有歷史消息
-          const allMessages = await chatMemory.getMessages(10000);
-          console.log(`🔍 從 IndexedDB 獲取到 ${allMessages.length} 條真實聊天記錄`);
+          // 修復：共享記憶作為回憶而非延續
+          let allMessages: any[] = [];
+          const isSharedMemory = conversationSettings?.sharedMemory ?? true; // 預設為共享記憶
+          
+          if (!isSharedMemory && conversationId) {
+            // 非共享記憶：只獲取當前對話串的訊息
+            allMessages = await chatMemory.getMessagesByConversation(conversationId, 1000);
+            console.log(`🔍 非共享記憶模式：從 IndexedDB 獲取到對話串 ${conversationId} 的 ${allMessages.length} 條訊息`);
+          } else if (isSharedMemory && conversationId) {
+            // 共享記憶：獲取所有對話串的訊息作為回憶，但排除當前對話串的最近訊息
+            const allMessagesFromAllConversations = await chatMemory.getMessages(10000);
+            const currentConversationMessages = await chatMemory.getMessagesByConversation(conversationId, 1000);
+            
+            // 過濾掉當前對話串的訊息，避免重複檢索
+            // 這些訊息將作為"回憶"提供給AI，而不是延續的話題
+            allMessages = allMessagesFromAllConversations.filter(msg => 
+              !currentConversationMessages.some(currentMsg => currentMsg.id === msg.id)
+            );
+            console.log(`🔍 共享記憶模式（回憶模式）：從 IndexedDB 獲取到其他對話串的 ${allMessages.length} 條訊息作為回憶（排除當前對話串）`);
+          } else {
+            // 沒有對話串ID時，獲取所有訊息
+            allMessages = await chatMemory.getMessages(10000);
+            console.log(`🔍 共享記憶模式：從 IndexedDB 獲取到 ${allMessages.length} 條真實聊天記錄`);
+          }
           
           // 修復：確保時間戳格式正確
           const normalizedMessages = allMessages.map(msg => ({
@@ -368,7 +368,9 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
             body: JSON.stringify({
               query: inputText.trim(),
               messages: normalizedMessages, // 使用標準化的消息
-              topK: 20
+              topK: 20,
+              conversationId: conversationId || undefined,
+              sharedMemory: isSharedMemory
             })
           });
 
@@ -486,32 +488,26 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
       console.log('🎯 相關歷史記錄:', relevantHistory.length, '條');
       console.log('📨 總歷史記錄發送給 AI:', recentHistory.length + relevantHistory.length, '條');
       
-      // 參考 CABM：將記憶直接注入到用戶消息中
-      let messageWithMemory = inputText.trim();
+      // 記憶通過history參數傳遞，不注入到用戶訊息中
+      const messageWithMemory = inputText.trim();
       
       if (relevantHistory.length > 0) {
-        // 格式化記憶內容（改進格式）
-        const memoryContent = relevantHistory.map(msg => 
-          `${msg.role === 'user' ? '用戶' : '助手'}: ${msg.content}`
-        ).join('\n\n');
-        
-        const memoryPrompt = `請仔細閱讀以下相關的歷史記錄，這些是我們之前討論過的內容。請基於這些記錄來回答，不要說"我不記得"。如果用戶要求完整的故事，請盡可能提供完整的內容：\n\n${memoryContent}\n\n現在用戶說：`;
-        
-        messageWithMemory = memoryPrompt + inputText.trim();
-        
-        console.log('🧠 記憶已注入到用戶消息中，記憶內容:', memoryContent.substring(0, 100) + '...');
+        console.log('🧠 記憶將通過history參數傳遞，記憶內容:', relevantHistory.length, '條');
       }
       
-      // 添加最近的對話作為上下文，幫助 AI 理解用戶意圖
+      // 合併相關歷史記錄和最近對話作為上下文
       const contextHistory = recentHistory.slice(-5); // 最近5條對話
+      const combinedHistory = [...relevantHistory, ...contextHistory];
       
       const request: ChatRequest = {
         message: messageWithMemory,
         images: imageUrls, // 使用已處理的圖片
         personality: preferences.aiPersonality,
         customPersonalityText: preferences.customPersonalityText,
-        history: contextHistory, // 發送最近歷史作為上下文
-        jailbreakEnabled: preferences.jailbreakEnabled
+        history: combinedHistory, // 發送相關歷史和最近對話作為上下文
+        jailbreakEnabled: preferences.jailbreakEnabled,
+        conversationId: conversationId || undefined,
+        source: 'web' as const
       };
 
       const response = await fetch('/api/chat', {
@@ -538,11 +534,15 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
         timestamp: new Date(),
         utterances: [],
         citations: [],
-        processing: true
+        processing: true,
+        conversationId: conversationId || undefined
       };
 
       setMessages(prev => [...prev, assistantMessage]);
       // 不要在這裡保存，等完成後再保存，避免重複
+
+      // 修復：使用遞增計數器追蹤分段索引
+      let segmentCounter = 0;
 
       // 處理 SSE 串流
       const decoder = new TextDecoder();
@@ -563,26 +563,52 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
               const { type: event, data } = sseData;
 
             if (event === 'utterance') {
-              // 檢查文字內容，避免空白氣泡
+              // 修復：每個 utterance 都是一個獨立的分段消息
               const textContent = data.text ? data.text.trim() : '';
               if (textContent.length > 0) {
-                // 保存 turnId 和 candidateId 到訊息中
                 const turnId = data.turnId;
                 const candidateId = data.candidateId;
                 
-                console.log('Received utterance with IDs:', { turnId, candidateId });
+                console.log('✅ 收到分段 utterance:', textContent.substring(0, 50) + '...');
                 
-                // 累積所有文本到當前消息
-                assistantMessage.content = (assistantMessage.content || '') + textContent;
-                assistantMessage.turnId = turnId;
-                assistantMessage.candidateId = candidateId;
-                
-                setMessages(prev => prev.map(msg => 
-                  msg.id === assistantMessage.id 
-                    ? { ...msg, content: assistantMessage.content, turnId, candidateId }
-                    : msg
-                ));
-                // 不要在串流過程中保存，只更新 UI
+                // 如果是第一個分段，更新主消息
+                if (!assistantMessage.content) {
+                  assistantMessage.content = textContent;
+                  assistantMessage.turnId = turnId;
+                  assistantMessage.candidateId = candidateId;
+                  assistantMessage.processing = false;
+                  
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === assistantMessage.id 
+                      ? { ...msg, content: textContent, turnId, candidateId, processing: false }
+                      : msg
+                  ));
+                  
+                  // 立即保存第一個分段
+                  await chatMemory.saveMessage(assistantMessage);
+                } else {
+                  // 後續分段：創建新的獨立消息
+                  segmentCounter++; // 遞增計數器
+                  const segmentMessage: ChatMessageType = {
+                    id: `msg_${Date.now()}_assistant_segment_${Math.random().toString(36).substr(2, 9)}`,
+                    role: 'assistant',
+                    content: textContent,
+                    timestamp: new Date(),
+                    processing: false,
+                    turnId,
+                    candidateId,
+                    isSegment: true,
+                    segmentGroupId: assistantMessage.id,
+                    segmentIndex: segmentCounter, // 使用計數器而非 messages 狀態
+                    conversationId: conversationId || undefined
+                  };
+                  
+                  setMessages(prev => [...prev, segmentMessage]);
+                  
+                  // 立即保存分段消息
+                  await chatMemory.saveMessage(segmentMessage);
+                  console.log(`✅ 創建並保存新分段消息 (索引 ${segmentCounter}):`, segmentMessage.id);
+                }
               }
             } else if (event === 'citation') {
               setMessages(prev => prev.map(msg => 
@@ -621,67 +647,61 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
               // 錯誤時也要保存
               await chatMemory.saveMessage(assistantMessage);
             } else if (event === 'done') {
-              // 生成完成後進行智能分段
-              if (assistantMessage.content) {
-                const segments = splitMessageIntoSegments(assistantMessage.content);
-                
-                if (segments.length > 1) {
-                  // 如果有多個段落，創建多個消息
-                  const newMessages: ChatMessageType[] = [];
-                  const baseTimestamp = new Date().getTime();
-                  
-                  segments.forEach((segment: string, index: number) => {
-                    const segmentMessage: ChatMessageType = {
-                      id: `segment_${assistantMessage.id}_${index}`,
-                      role: 'assistant',
-                      content: segment,
-                      timestamp: new Date(baseTimestamp + index),
-                      processing: false,
-                      turnId: assistantMessage.turnId,
-                      candidateId: assistantMessage.candidateId,
-                      route: assistantMessage.route,
-                      citations: assistantMessage.citations
-                    };
-                    newMessages.push(segmentMessage);
-                  });
-                  
-                  // 移除原始消息，添加分段後的消息
-                  setMessages(prev => {
-                    const filtered = prev.filter(msg => msg.id !== assistantMessage.id);
-                    return [...filtered, ...newMessages];
-                  });
-                  
-                  // ========== 關鍵修復：先刪除原始消息，再保存分段消息 ==========
-                  await chatMemory.deleteMessage(assistantMessage.id);
-                  
-                  // 批量保存所有分段（一次性操作）
-                  for (const segmentMessage of newMessages) {
-                    await chatMemory.saveMessage(segmentMessage);
-                  }
-                } else {
-                  // 只有一個段落，直接標記為完成
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === assistantMessage.id 
-                      ? { ...msg, processing: false }
-                      : msg
-                  ));
-                  assistantMessage.processing = false;
-                  await chatMemory.saveMessage(assistantMessage);
-                }
-              } else {
-                // 沒有內容，直接標記為完成
-                setMessages(prev => prev.map(msg => 
-                  msg.id === assistantMessage.id 
-                    ? { ...msg, processing: false }
-                    : msg
-                ));
-                assistantMessage.processing = false;
-                await chatMemory.saveMessage(assistantMessage);
-              }
+              // 修復：生成完成，分段已在 utterance 事件中保存，不要重複保存
+              setMessages(prev => prev.map(msg => 
+                msg.id === assistantMessage.id 
+                  ? { ...msg, processing: false }
+                  : msg
+              ));
+              assistantMessage.processing = false;
               
               // 立即重置所有處理狀態
               setIsProcessing(false);
               setIsLoading(false);
+              
+              console.log('✅ 所有分段已完成並保存');
+              
+              // 修復：如果是新聊天室的第一輪問答，自動生成標題
+              if (conversationId) {
+                const allMsgs = await chatMemory.getMessagesByConversation(conversationId, 100);
+                // 如果只有2條消息（1問1答），觸發自動命名
+                if (allMsgs.length === 2 || (allMsgs.length > 2 && allMsgs.length <= 10)) {
+                  const userMsgs = allMsgs.filter(m => m.role === 'user');
+                  if (userMsgs.length === 1) {
+                    // 第一輪問答完成，生成標題
+                    try {
+                      const userMessage = userMsgs[0].content;
+                      const assistantMessages = allMsgs.filter(m => m.role === 'assistant');
+                      const assistantMessage = assistantMessages.map(m => m.content).join(' ');
+                      
+                      const titleResponse = await fetch('/api/conversations/generate-title', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          userMessage: userMessage.substring(0, 200),
+                          assistantMessage: assistantMessage.substring(0, 200)
+                        })
+                      });
+                      
+                      if (titleResponse.ok) {
+                        const { title } = await titleResponse.json();
+                        // 更新對話串標題
+                        await fetch(`/api/conversations/${conversationId}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ title: title.substring(0, 50) })
+                        });
+                        console.log(`✅ 自動生成聊天室標題: ${title}`);
+                        
+                        // 通知父組件刷新對話串列表
+                        window.dispatchEvent(new CustomEvent('conversation-updated'));
+                      }
+                    } catch (error) {
+                      console.warn('自動生成標題失敗:', error);
+                    }
+                  }
+                }
+              }
               
               // 將新對話添加到向量記憶中
               try {
@@ -739,10 +759,10 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
   };
 
   // 語音輸入（佔位功能）
-  const toggleVoiceInput = () => {
-    setIsListening(!isListening);
-    // 這裡將來會實作語音識別
-  };
+  // const toggleVoiceInput = () => {
+  //   setIsListening(!isListening);
+  //   // 這裡將來會實作語音識別
+  // };
 
   // 檔案上傳處理
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -751,7 +771,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
       setUploadedFiles(prev => [...prev, ...files]);
       
       // 分離圖片文件和其他文件
-      const imageFiles = files.filter(file => file.type.startsWith('image/'));
+      // const imageFiles = files.filter(file => file.type.startsWith('image/'));
       const otherFiles = files.filter(file => !file.type.startsWith('image/'));
       
       // 只處理非圖片文件，圖片文件會在發送消息時處理
@@ -804,7 +824,9 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
       {/* 標題列 */}
       <div className={`${themeClass === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b px-6 py-4`}>
         <div className="flex items-center justify-between">
-          <h1 className={`text-xl font-semibold ${themeClass === 'dark' ? 'text-white' : 'text-gray-900'}`}>Igasaki</h1>
+          <h1 className={`text-xl font-semibold ${themeClass === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            {conversationTitle || 'Igasaki'}
+          </h1>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowHistoryQuery(true)}
@@ -836,19 +858,61 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
             onClick={(e) => e.stopPropagation()}
           >
             {/* 標題欄 - 星穹鐵道風格 */}
-            <div className="bg-gradient-to-r from-blue-900 via-purple-900 to-blue-900 px-8 py-6 rounded-t-2xl border-b border-gray-700 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
-                  <History className="w-5 h-5 text-white" />
+            <div className="bg-gradient-to-r from-blue-900 via-purple-900 to-blue-900 px-8 py-6 rounded-t-2xl border-b border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
+                    <History className="w-5 h-5 text-white" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">歷史紀錄</h2>
                 </div>
-                <h2 className="text-xl font-bold text-white tracking-wide">歷史紀錄</h2>
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-gray-300 hover:text-white transition-colors duration-200"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                onClick={() => setShowHistory(false)}
-                className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-gray-300 hover:text-white transition-colors duration-200"
-              >
-                ✕
-              </button>
+              
+              {/* 過濾器 */}
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-300">顯示範圍：</span>
+                <div className="flex bg-gray-800 rounded-lg p-1">
+                  <button
+                    onClick={() => {
+                      setHistoryFilter('all');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1 text-sm rounded-md transition-all duration-200 ${
+                      historyFilter === 'all'
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'text-gray-300 hover:text-white hover:bg-gray-700'
+                    }`}
+                  >
+                    所有對話
+                  </button>
+                  <button
+                    onClick={() => {
+                      setHistoryFilter('current');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1 text-sm rounded-md transition-all duration-200 ${
+                      historyFilter === 'current'
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'text-gray-300 hover:text-white hover:bg-gray-700'
+                    }`}
+                    disabled={!conversationId}
+                  >
+                    當前聊天室
+                  </button>
+                </div>
+                <button
+                  onClick={loadHistory}
+                  className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors duration-200"
+                >
+                  重新載入
+                </button>
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-gray-900 to-gray-800">
@@ -867,7 +931,7 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                   <div className="space-y-4">
                     {allMessages
                       .slice((currentPage - 1) * messagesPerPage, currentPage * messagesPerPage)
-                      .map((message, index) => (
+                      .map((message) => (
                         <div
                           key={message.id}
                           className="bg-gradient-to-r from-gray-800 to-gray-700 rounded-xl border border-gray-600 p-4 hover:border-gray-500 transition-all duration-200 shadow-lg"
@@ -915,10 +979,32 @@ export default function ChatInterface({ themeClass = 'light' }: ChatInterfacePro
                             </button>
                           </div>
                           <div className="text-sm text-gray-200 leading-relaxed">
-                            {message.content.length > 150 
-                              ? `${message.content.substring(0, 150)}...` 
-                              : message.content
-                            }
+                            <ReactMarkdown 
+                              remarkPlugins={[remarkGfm, remarkBreaks]}
+                              components={{
+                                p: ({ children }: any) => <p className="mb-1 last:mb-0">{children}</p>,
+                                code: ({ children, className }: any) => (
+                                  <code className={`${className} bg-gray-800 px-1 py-0.5 rounded text-xs`}>
+                                    {children}
+                                  </code>
+                                ),
+                                pre: ({ children }: any) => (
+                                  <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto mb-1">
+                                    {children}
+                                  </pre>
+                                ),
+                                strong: ({ children }: any) => <strong className="font-bold">{children}</strong>,
+                                em: ({ children }: any) => <em className="italic">{children}</em>,
+                                ul: ({ children }: any) => <ul className="list-disc list-inside mb-1">{children}</ul>,
+                                ol: ({ children }: any) => <ol className="list-decimal list-inside mb-1">{children}</ol>,
+                                li: ({ children }: any) => <li className="mb-0.5">{children}</li>,
+                              }}
+                            >
+                              {message.content.length > 150 
+                                ? `${message.content.substring(0, 150)}...` 
+                                : message.content
+                              }
+                            </ReactMarkdown>
                           </div>
                         </div>
                       ))

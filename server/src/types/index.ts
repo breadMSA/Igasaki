@@ -7,12 +7,24 @@ export interface ChatRequest {
   customPersonalityText?: string;
   history?: ChatMessage[];
   jailbreakEnabled?: boolean;
+  conversationId?: string;
+  source?: 'web' | 'extension';
+  sharedMemory?: boolean;
 }
 
 export interface ChatMessage {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: Date;
+  conversationId?: string;
+  source?: 'web' | 'extension';
+  turnId?: string;
+  candidateId?: string;
+  route?: string;
+  citations?: CitationEvent[];
+  processing?: boolean;
+  utterances?: string[];
 }
 
 export interface TTSRequest {
@@ -232,4 +244,88 @@ export class ExternalServiceError extends AppError {
   constructor(service: string, message: string) {
     super(`${service} error: ${message}`, 502, 'EXTERNAL_SERVICE_ERROR');
   }
+}
+
+// Multi-Room Chat Types
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+  messageCount: number;
+  preview?: string;
+  settings: ConversationSettings;
+}
+
+export interface ConversationSettings {
+  sharedMemory: boolean; // 使用者可選：是否共享記憶
+}
+
+export interface CreateConversationRequest {
+  title?: string;
+  settings?: Partial<ConversationSettings>;
+}
+
+export interface UpdateConversationRequest {
+  title?: string;
+  settings?: Partial<ConversationSettings>;
+}
+
+export interface ConversationListResponse {
+  conversations: Conversation[];
+  total: number;
+}
+
+export interface ConversationMessagesResponse {
+  messages: ChatMessage[];
+  total: number;
+  hasMore: boolean;
+}
+
+// Tool Calling Types
+export interface Tool {
+  name: string;
+  description: string;
+  parameters: object; // JSON Schema
+  execute: (params: any) => Promise<any>;
+  requiresConfirmation: boolean;
+}
+
+export interface ToolCall {
+  name: string;
+  parameters: any;
+  result?: any;
+  status: 'pending' | 'executed' | 'failed';
+}
+
+export interface EmailDraft {
+  id: string;
+  to: string;
+  subject: string;
+  body: string;
+  createdAt: Date;
+  status: 'draft' | 'sent';
+  conversationId?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  description?: string;
+  createdAt: Date;
+  conversationId?: string;
+}
+
+// Live2D Emotion Types
+export interface EmotionEvent {
+  emotion: string;
+  text: string;
+  intensity?: number;
+}
+
+export interface Live2DEmotionMapping {
+  expression: number;
+  intensity: number;
 }

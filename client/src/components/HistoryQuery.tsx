@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Clock, MessageSquare, TrendingUp, Calendar, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Clock, TrendingUp, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { chatMemory } from '@/hooks/useMemoryStore';
 import { ChatMessage } from '@/types';
 
@@ -298,9 +301,31 @@ export default function HistoryQuery({ isOpen, onClose, onSelectMessage, userAva
                             {formatTimestamp(message.timestamp)}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-200">
-                          {truncateContent(message.content)}
-                        </p>
+                        <div className="text-sm text-gray-200">
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
+                            components={{
+                              p: ({ children }: any) => <p className="mb-1 last:mb-0">{children}</p>,
+                              code: ({ children, className }: any) => (
+                                <code className={`${className} bg-gray-800 px-1 py-0.5 rounded text-xs`}>
+                                  {children}
+                                </code>
+                              ),
+                              pre: ({ children }: any) => (
+                                <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto mb-1">
+                                  {children}
+                                </pre>
+                              ),
+                              strong: ({ children }: any) => <strong className="font-bold">{children}</strong>,
+                              em: ({ children }: any) => <em className="italic">{children}</em>,
+                              ul: ({ children }: any) => <ul className="list-disc list-inside mb-1">{children}</ul>,
+                              ol: ({ children }: any) => <ol className="list-decimal list-inside mb-1">{children}</ol>,
+                              li: ({ children }: any) => <li className="mb-0.5">{children}</li>,
+                            }}
+                          >
+                            {truncateContent(message.content)}
+                          </ReactMarkdown>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -356,9 +381,31 @@ export default function HistoryQuery({ isOpen, onClose, onSelectMessage, userAva
                           {formatTimestamp(message.timestamp)}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-200">
-                        {truncateContent(message.content)}
-                      </p>
+                      <div className="text-sm text-gray-200">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          components={{
+                            p: ({ children }: any) => <p className="mb-1 last:mb-0">{children}</p>,
+                            code: ({ children, className }: any) => (
+                              <code className={`${className} bg-gray-800 px-1 py-0.5 rounded text-xs`}>
+                                {children}
+                              </code>
+                            ),
+                            pre: ({ children }: any) => (
+                              <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto mb-1">
+                                {children}
+                              </pre>
+                            ),
+                            strong: ({ children }: any) => <strong className="font-bold">{children}</strong>,
+                            em: ({ children }: any) => <em className="italic">{children}</em>,
+                            ul: ({ children }: any) => <ul className="list-disc list-inside mb-1">{children}</ul>,
+                            ol: ({ children }: any) => <ol className="list-decimal list-inside mb-1">{children}</ol>,
+                            li: ({ children }: any) => <li className="mb-0.5">{children}</li>,
+                          }}
+                        >
+                          {truncateContent(message.content)}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 </div>

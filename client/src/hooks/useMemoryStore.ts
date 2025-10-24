@@ -176,7 +176,7 @@ export const chatMemory = {
       // 同時保存到服務器（異步，不阻塞）
       import('@/utils/serverSync')
         .then(({ saveMessageToServer }) => saveMessageToServer(message))
-        .catch(serverError => {
+        .catch(() => {
           console.warn('⚠️ 保存到服務器失敗（本地已保存）');
         });
       
@@ -198,15 +198,48 @@ export const chatMemory = {
   },
 
   async getMessagesByConversation(conversationId: string, limit: number = 50): Promise<ChatMessage[]> {
-    return await db.messages
-      .where('conversationId')
-      .equals(conversationId)
-      .toArray()
-      .then(messages => 
-        messages
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-          .slice(0, limit)
-      );
+    try {
+      // 總是從服務器獲取最新訊息
+      try {
+        const { fetchMessagesFromConversation } = await import('@/utils/serverSync');
+        const serverMessages = await fetchMessagesFromConversation(conversationId, limit * 10);
+        
+        if (serverMessages.length > 0) {
+          // 清除該對話串的舊訊息
+          await db.messages.where('conversationId').equals(conversationId).delete();
+          
+          // 將服務器訊息保存到本地（使用 bulkPut 而非 bulkAdd 以避免重複鍵錯誤）
+          const messagesToSave = serverMessages.map(msg => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+            processing: false
+          }));
+          
+          await db.messages.bulkPut(messagesToSave);
+          console.log(`✅ 已從服務器同步 ${messagesToSave.length} 條對話串訊息到本地`);
+          
+          return messagesToSave
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        }
+      } catch (error) {
+        console.warn('從服務器同步對話串訊息失敗，使用本地緩存:', error);
+        
+        // 如果服務器同步失敗，使用本地緩存
+        const localMessages = await db.messages
+          .where('conversationId')
+          .equals(conversationId)
+          .toArray();
+        
+        return localMessages
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+          .slice(0, limit);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('獲取對話串訊息失敗:', error);
+      return [];
+    }
   },
 
   async deleteMessage(messageId: string): Promise<void> {
@@ -222,7 +255,16 @@ export const chatMemory = {
   },
 
   async deleteConversation(conversationId: string): Promise<void> {
+    // 刪除本地IndexedDB中的消息
     await db.messages.where('conversationId').equals(conversationId).delete();
+    console.log(`🗑️ 已刪除對話串 ${conversationId} 的所有本地消息`);
+    
+    // 同時從服務器刪除
+    import('@/utils/serverSync')
+      .then(({ deleteConversationFromServer }) => deleteConversationFromServer(conversationId))
+      .catch(() => {
+        console.warn('⚠️ 從服務器刪除對話串失敗（本地已刪除）');
+      });
   },
 
   async clearMessages(): Promise<void> {
@@ -559,6 +601,16 @@ export const dbMaintenance = {
 
   async cleanup(): Promise<void> {
     await cleanupOldMessages();
+  },
+
+  async deleteMessagesByConversation(conversationId: string): Promise<void> {
+    try {
+      await db.messages.where('conversationId').equals(conversationId).delete();
+      console.log(`🗑️ 已刪除對話串 ${conversationId} 的所有訊息`);
+    } catch (error) {
+      console.error('刪除對話串訊息失敗:', error);
+      throw error;
+    }
   },
 
   async exportData(): Promise<{

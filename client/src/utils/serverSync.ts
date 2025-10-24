@@ -78,6 +78,31 @@ export async function fetchMessagesFromServer(limit?: number, offset?: number): 
 }
 
 /**
+ * 從服務器獲取特定對話串的訊息
+ */
+export async function fetchMessagesFromConversation(conversationId: string, limit?: number, offset?: number): Promise<ChatMessage[]> {
+  try {
+    const params = new URLSearchParams();
+    if (limit !== undefined) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    
+    const response = await fetch(`/api/conversations/${conversationId}/messages?${params}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return [];
+      }
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.messages || [];
+  } catch (error) {
+    console.warn('從服務器獲取對話串訊息失敗:', error);
+    return [];
+  }
+}
+
+/**
  * 將單條消息保存到服務器
  */
 export async function saveMessageToServer(message: Omit<ChatMessage, 'id'>): Promise<ChatMessage | null> {
@@ -210,6 +235,27 @@ export async function clearMessagesOnServer(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('清空服務器消息失敗:', error);
+    return false;
+  }
+}
+
+/**
+ * 刪除服務器上的對話串
+ */
+export async function deleteConversationFromServer(conversationId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    console.log(`✅ 對話串 ${conversationId} 已從服務器刪除`);
+    return true;
+  } catch (error) {
+    console.error('從服務器刪除對話串失敗:', error);
     return false;
   }
 }

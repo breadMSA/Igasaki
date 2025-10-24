@@ -1,0 +1,54 @@
+[
+  {
+    "id": "msg_1761283382512_user",
+    "role": "user",
+    "content": "嗨，能和我說說現在新北永和的天氣嗎",
+    "timestamp": "2025-10-24T05:23:02.512Z",
+    "conversationId": "conv_1761279010841_qycj2peym",
+    "source": "web"
+  },
+  {
+    "id": "msg_1761283388563_assistant",
+    "role": "assistant",
+    "content": "嘿！永和現在是下午 1 點 23 分。",
+    "timestamp": "2025-10-24T05:23:08.563Z",
+    "conversationId": "conv_1761279010841_qycj2peym",
+    "source": "web",
+    "isSegment": false,
+    "segmentGroupId": "group_1761283388563_w9axnz025",
+    "segmentIndex": 0
+  },
+  {
+    "id": "msg_1761283388564_assistant_segment_y36pzfq6j",
+    "role": "assistant",
+    "content": "目前是小雨的天氣，氣溫大概在攝氏 25 到 26 度之間，體感溫度會再高一點，大約是攝氏 28 度。降雨機率有 40% 到 45% 喔。",
+    "timestamp": "2025-10-24T05:23:08.564Z",
+    "conversationId": "conv_1761279010841_qycj2peym",
+    "source": "web",
+    "isSegment": true,
+    "segmentGroupId": "group_1761283388563_w9axnz025",
+    "segmentIndex": 1
+  },
+  {
+    "id": "msg_1761283388565_assistant_segment_0dyez1zsg",
+    "role": "assistant",
+    "content": "今天白天到晚上都會有陣雨或小雨，氣溫大概維持在 22 到 26 度左右，濕度還蠻高的，記得出門要帶傘，穿輕便一點的防水外套會比較舒服喔。",
+    "timestamp": "2025-10-24T05:23:08.565Z",
+    "conversationId": "conv_1761279010841_qycj2peym",
+    "source": "web",
+    "isSegment": true,
+    "segmentGroupId": "group_1761283388563_w9axnz025",
+    "segmentIndex": 2
+  },
+  {
+    "id": "msg_1761283388566_assistant_segment_xo18j5l2m",
+    "role": "assistant",
+    "content": "你有什麼特別的計畫嗎？",
+    "timestamp": "2025-10-24T05:23:08.566Z",
+    "conversationId": "conv_1761279010841_qycj2peym",
+    "source": "web",
+    "isSegment": true,
+    "segmentGroupId": "group_1761283388563_w9axnz025",
+    "segmentIndex": 3
+  }
+]

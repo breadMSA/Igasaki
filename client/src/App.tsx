@@ -4,14 +4,17 @@ import ChatInterface from '@/components/ChatInterface';
 import AnimationModelDisplay from '@/components/AnimationModelDisplay';
 import SettingsModal from '@/components/SettingsModal';
 import ToastContainer from '@/components/ToastContainer';
+import ConversationSidebar from '@/components/ConversationSidebar';
 import { useMemoryStore } from '@/hooks/useMemoryStore';
 import { useAppState } from '@/hooks/useAppState';
+import { useConversations } from '@/hooks/useConversations';
 import { ServiceStatus } from '@/types';
 
 function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showConversationSidebar, setShowConversationSidebar] = useState(true);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>({
     chat: false,
     tts: false,
@@ -22,6 +25,53 @@ function App() {
 
   const { isInitialized, preferences, updatePreferences } = useAppState();
   const { isReady: memoryReady } = useMemoryStore();
+  const {
+    conversations,
+    activeConversationId,
+    createConversation,
+    updateConversation,
+    deleteConversation,
+    setActiveConversationId,
+    refreshConversations
+  } = useConversations();
+
+  // 獲取當前聊天室的標題和設定
+  const currentConversation = conversations.find(conv => conv.id === activeConversationId);
+  const currentConversationTitle = currentConversation?.title;
+  const currentConversationSettings = currentConversation?.settings;
+
+  // 對話串處理函數
+  const handleCreateConversation = async () => {
+    try {
+      await createConversation();
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+    }
+  };
+
+  const handleUpdateConversation = async (id: string, title: string) => {
+    try {
+      await updateConversation(id, { title });
+    } catch (error) {
+      console.error('Failed to update conversation:', error);
+    }
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await deleteConversation(id);
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
+  };
+
+  const handleUpdateConversationSettings = async (id: string, settings: { sharedMemory: boolean }) => {
+    try {
+      await updateConversation(id, { settings });
+    } catch (error) {
+      console.error('Failed to update conversation settings:', error);
+    }
+  };
 
   // 添加調試信息
   useEffect(() => {
@@ -36,6 +86,16 @@ function App() {
       setErrorMessage('調試信息錯誤: ' + (error as Error).message);
     }
   }, [isInitialized, memoryReady, preferences]);
+
+  // 監聽對話串更新事件（用於自動命名）
+  useEffect(() => {
+    const handleConversationUpdate = () => {
+      refreshConversations();
+    };
+    
+    window.addEventListener('conversation-updated', handleConversationUpdate);
+    return () => window.removeEventListener('conversation-updated', handleConversationUpdate);
+  }, [refreshConversations]);
 
   // 檢查服務狀態
   useEffect(() => {
@@ -150,7 +210,20 @@ function App() {
       
       {/* 主要內容 */}
       <div className="relative z-10 flex flex-1">
-        {/* 側邊欄 */}
+        {/* 對話串側邊欄 */}
+        {showConversationSidebar && (
+          <ConversationSidebar
+            conversations={conversations}
+            activeConversationId={activeConversationId}
+            onConversationSelect={setActiveConversationId}
+            onCreateConversation={handleCreateConversation}
+            onUpdateConversation={handleUpdateConversation}
+            onDeleteConversation={handleDeleteConversation}
+            themeClass={themeClass}
+          />
+        )}
+
+        {/* 左側導航欄 */}
         <div className={`w-16 ${themeClass === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r flex flex-col items-center py-4 space-y-4`}>
           {/* Logo */}
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -160,8 +233,11 @@ function App() {
           {/* 導航按鈕 */}
           <nav className="flex flex-col space-y-2">
             <button
-              className={`p-3 ${themeClass === 'dark' ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-700' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'} rounded-lg transition-colors duration-150`}
-              title="聊天"
+              onClick={() => setShowConversationSidebar(!showConversationSidebar)}
+              className={`p-3 ${themeClass === 'dark' ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-700' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'} rounded-lg transition-colors duration-150 ${
+                showConversationSidebar ? (themeClass === 'dark' ? 'bg-gray-700 text-blue-400' : 'bg-blue-50 text-blue-600') : ''
+              }`}
+              title={showConversationSidebar ? "隱藏聊天室" : "顯示聊天室"}
             >
               <MessageCircle className="w-5 h-5" />
             </button>
@@ -173,6 +249,7 @@ function App() {
             >
               <Settings className="w-5 h-5" />
             </button>
+
           </nav>
 
           {/* 服務狀態指示器 */}
@@ -201,7 +278,12 @@ function App() {
         <div className="flex-1 flex">
           {/* 聊天介面 */}
           <div className="flex-1 flex flex-col">
-            <ChatInterface themeClass={themeClass} />
+        <ChatInterface
+          themeClass={themeClass}
+          conversationId={activeConversationId}
+          conversationTitle={currentConversationTitle}
+          conversationSettings={currentConversationSettings}
+        />
           </div>
 
           {/* Live2D 顯示區域 */}
@@ -224,8 +306,11 @@ function App() {
           preferences={preferences}
           onUpdatePreferences={updatePreferences}
           serviceStatus={serviceStatus}
+          currentConversation={currentConversation}
+          onUpdateConversationSettings={handleUpdateConversationSettings}
         />
       )}
+
 
       {/* Toast 通知容器 */}
       <ToastContainer />

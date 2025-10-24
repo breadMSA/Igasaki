@@ -16,6 +16,10 @@ export interface ChatMessage {
   processing?: boolean;
   turnId?: string;
   candidateId?: string;
+  // 分段消息相關字段
+  isSegment?: boolean;
+  segmentIndex?: number;
+  segmentGroupId?: string;
   metadata?: {
     model?: string;
     tokens?: number;
@@ -37,6 +41,9 @@ export interface ChatRequest {
   customPersonalityText?: string;
   history?: { role: 'user' | 'assistant'; content: string }[];
   jailbreakEnabled?: boolean;
+  conversationId?: string;
+  source?: 'web' | 'extension';
+  sharedMemory?: boolean;
 }
 
 export interface TTSRequest {
@@ -137,10 +144,25 @@ export interface AudioAnalysis {
 export interface Conversation {
   id: string;
   title: string;
-  messages: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
   messageCount: number;
+  preview?: string;
+  settings: ConversationSettings;
+}
+
+export interface ConversationSettings {
+  sharedMemory: boolean; // 使用者可選：是否共享記憶
+}
+
+export interface CreateConversationRequest {
+  title?: string;
+  settings?: Partial<ConversationSettings>;
+}
+
+export interface UpdateConversationRequest {
+  title?: string;
+  settings?: Partial<ConversationSettings>;
 }
 
 export interface MemoryCard {

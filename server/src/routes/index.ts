@@ -4,6 +4,7 @@ import ttsRoutes from './tts.js';
 import extractKeywordsRoutes from './extractKeywords.js';
 import vectorMemoryRoutes from './vectorMemory.js';
 import userDataRoutes from './userData.js';
+import conversationsRoutes from './conversations.js';
 import { logger } from '@/lib/logger.js';
 
 const router = Router();
@@ -14,6 +15,7 @@ router.use('/tts', ttsRoutes);
 router.use('/extract-keywords', extractKeywordsRoutes);
 router.use('/vector-memory', vectorMemoryRoutes);
 router.use('/user-data', userDataRoutes);
+router.use('/conversations', conversationsRoutes);
 
 // API 根路徑 - 基本資訊
 router.get('/', (req, res) => {

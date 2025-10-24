@@ -168,34 +168,34 @@ export default function AnimationModelDisplay() {
     }
   };
 
-  const loadModel = async (modelData: UploadedModel) => {
-    try {
-      setIsLoading(true);
-      setModelError(null);
-      setCurrentModel(modelData);
+  // const loadModel = async (modelData: UploadedModel) => {
+  //   try {
+  //     setIsLoading(true);
+  //     setModelError(null);
+  //     setCurrentModel(modelData);
 
-      if (modelData.type === 'live2d') {
-        setModelType('live2d');
-        if (!pixiAppRef.current) {
-          throw new Error('PixiJS app is not initialized.');
-        }
+  //     if (modelData.type === 'live2d') {
+  //       setModelType('live2d');
+  //       if (!pixiAppRef.current) {
+  //         throw new Error('PixiJS app is not initialized.');
+  //       }
         
-        if (modelData.id.startsWith('local_')) {
-          await loadLocalLive2DModel(modelData);
-        } else {
-          await loadLive2DModel(modelData);
-        }
-      } else if (modelData.type === 'vrm') {
-        setModelType('vrm');
-        await loadVRMModel(modelData);
-      }
-    } catch (error) {
-      console.error('Failed to load model:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      setModelError(`模型載入失敗: ${errorMessage}`);
-      setIsLoading(false);
-    }
-  };
+  //       if (modelData.id.startsWith('local_')) {
+  //         await loadLocalLive2DModel(modelData);
+  //       } else {
+  //         await loadLive2DModel(modelData);
+  //       }
+  //     } else if (modelData.type === 'vrm') {
+  //       setModelType('vrm');
+  //       await loadVRMModel(modelData);
+  //     }
+  //   } catch (error) {
+  //     console.error('Failed to load model:', error);
+  //     const errorMessage = error instanceof Error ? error.message : String(error);
+  //     setModelError(`模型載入失敗: ${errorMessage}`);
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const loadLive2DModel = async (modelData: UploadedModel) => {
     const modelFile = modelData.files.find(f => f.type === 'model');
@@ -793,7 +793,7 @@ export default function AnimationModelDisplay() {
             console.log('模型載入成功，清理資源...');
             
             // 從 PIXI.Assets 移除資源
-            blobUrlMap.forEach((blobUrl, fileName) => {
+            blobUrlMap.forEach((_, fileName) => {
               try {
                 PIXI.Assets.unload(fileName);
                 console.log(`從 PIXI.Assets 移除: ${fileName}`);

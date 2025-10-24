@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { User, Bot, Copy, Check, Play, Pause, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { ChatMessage as ChatMessageType } from '@/types';
 
 interface ChatMessageProps {
@@ -107,27 +108,6 @@ export default function ChatMessage({ message, userAvatar, botAvatar, preference
     );
   };
 
-  const renderRouteBadge = () => {
-    if (!message.route || message.route === 'gemini') {
-      return null;
-    }
-
-    const routeColors: { [key: string]: string } = {
-      charProxy: 'bg-purple-100 text-purple-800',
-      deny: 'bg-red-100 text-red-800'
-    };
-
-    const routeLabels: { [key: string]: string } = {
-      charProxy: 'c.ai',
-      deny: '已拒絕'
-    };
-
-    return (
-      <span className={`inline-flex items-center px-2 py-1 text-xs rounded-full ${routeColors[message.route]}`}>
-        {routeLabels[message.route]}
-      </span>
-    );
-  };
 
   return (
     <div className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -202,30 +182,36 @@ export default function ChatMessage({ message, userAvatar, botAvatar, preference
               ) : (
                 <div>
                   <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
                     components={{
-                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                      code: ({ children, className }) => (
+                      p: ({ children }: any) => <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>,
+                      code: ({ children, className }: any) => (
                         <code className={`${className} bg-gray-800 px-1 py-0.5 rounded text-sm`}>
                           {children}
                         </code>
                       ),
-                      pre: ({ children }) => (
+                      pre: ({ children }: any) => (
                         <pre className="bg-gray-800 p-3 rounded-lg overflow-x-auto mb-2">
                           {children}
                         </pre>
                       ),
-                      blockquote: ({ children }) => (
+                      blockquote: ({ children }: any) => (
                         <blockquote className="border-l-4 border-gray-500 pl-4 italic text-gray-300">
                           {children}
                         </blockquote>
                       ),
-                      ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                      em: ({ children }) => <em className="italic">{children}</em>,
-                      a: ({ children, href }) => (
+                      ul: ({ children }: any) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                      ol: ({ children }: any) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                      li: ({ children }: any) => <li className="mb-1">{children}</li>,
+                      strong: ({ children }: any) => <strong className="font-bold text-white">{children}</strong>,
+                      em: ({ children }: any) => <em className="italic">{children}</em>,
+                      h1: ({ children }: any) => <h1 className="text-2xl font-bold mb-3 mt-4 text-white">{children}</h1>,
+                      h2: ({ children }: any) => <h2 className="text-xl font-bold mb-2 mt-3 text-white">{children}</h2>,
+                      h3: ({ children }: any) => <h3 className="text-lg font-bold mb-2 mt-2 text-white">{children}</h3>,
+                      h4: ({ children }: any) => <h4 className="text-base font-bold mb-1 mt-2 text-white">{children}</h4>,
+                      h5: ({ children }: any) => <h5 className="text-sm font-bold mb-1 mt-1 text-white">{children}</h5>,
+                      h6: ({ children }: any) => <h6 className="text-xs font-bold mb-1 mt-1 text-white">{children}</h6>,
+                      a: ({ children, href }: any) => (
                         <a href={href} className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">
                           {children}
                         </a>

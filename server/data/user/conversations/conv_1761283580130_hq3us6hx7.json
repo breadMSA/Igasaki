@@ -1,0 +1,32 @@
+[
+  {
+    "id": "msg_1761283591582_user",
+    "role": "user",
+    "content": "你好",
+    "timestamp": "2025-10-24T05:26:31.582Z",
+    "conversationId": "conv_1761283580130_hq3us6hx7",
+    "source": "web"
+  },
+  {
+    "id": "msg_1761283597460_assistant",
+    "role": "assistant",
+    "content": "新北永和現在是下午1點26分，天氣是小雨，氣溫大約26°C，但體感溫度有28°C，濕度大概82%左右。今天白天到晚上都會有陣雨，降雨機率在40%到45%之間喔。",
+    "timestamp": "2025-10-24T05:26:37.460Z",
+    "conversationId": "conv_1761283580130_hq3us6hx7",
+    "source": "web",
+    "isSegment": false,
+    "segmentGroupId": "group_1761283597460_u7ot4epow",
+    "segmentIndex": 0
+  },
+  {
+    "id": "msg_1761283597461_assistant_segment_kdv2p7vvs",
+    "role": "assistant",
+    "content": "你有什麼地方想去嗎？可能需要帶把傘比較方便。",
+    "timestamp": "2025-10-24T05:26:37.461Z",
+    "conversationId": "conv_1761283580130_hq3us6hx7",
+    "source": "web",
+    "isSegment": true,
+    "segmentGroupId": "group_1761283597460_u7ot4epow",
+    "segmentIndex": 1
+  }
+]

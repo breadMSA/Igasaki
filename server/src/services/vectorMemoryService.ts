@@ -24,6 +24,7 @@ export class VectorMemoryService {
     vector: number[];
     timestamp: Date;
     role: 'user' | 'assistant';
+    conversationId?: string; // 新增：關聯的對話串ID
   }> = [];
 
   constructor() {
@@ -44,16 +45,8 @@ export class VectorMemoryService {
         });
         console.log('✅ OpenAI 客戶端初始化成功');
         
-        // 重要：在初始化時嘗試加載已存在的向量數據庫
-        this.loadFromFile().then(loaded => {
-          if (loaded) {
-            console.log(`✅ 成功從文件加載向量數據庫，包含 ${this.conversations.length} 條對話`);
-          } else {
-            console.log('📁 沒有找到已存在的向量數據庫文件，將在首次搜尋時創建');
-          }
-        }).catch(error => {
-          console.error('❌ 加載向量數據庫失敗:', error);
-        });
+        // 修復：不在初始化時自動加載向量數據庫，避免載入所有記憶
+        console.log('📁 向量記憶服務已初始化，將在需要時按需加載記憶');
         
       } catch (error) {
         console.error('❌ OpenAI 客戶端初始化失敗:', error);
@@ -125,20 +118,83 @@ export class VectorMemoryService {
   /**
    * 搜尋相關的歷史記錄（真正參考 CABM 架構）
    */
-  async searchRelevantHistory(query: string, messages: ChatMessage[], topK: number = 10): Promise<VectorSearchResult[]> {
+  async searchRelevantHistory(query: string, messages: ChatMessage[], topK: number = 10, conversationId?: string, sharedMemory: boolean = true): Promise<VectorSearchResult[]> {
     if (!this.client) {
       console.warn('⚠️ OpenAI 客戶端未初始化，無法進行向量搜尋');
       return [];
     }
 
     try {
-      // 重要修復：如果沒有預先構建的向量數據庫，先嘗試從文件加載
+      console.log(`🔍 開始搜尋歷史記錄，共享記憶: ${sharedMemory}, 對話串ID: ${conversationId}`);
+      
+      // 獲取所有對話串的設定，用於正確過濾記憶
+      let sharedConversationIds: string[] = [];
+      if (conversationId) {
+        try {
+          const fs = await import('fs/promises');
+          const conversationsData = await fs.readFile('./data/user/conversations.json', 'utf-8');
+          const conversations = JSON.parse(conversationsData);
+          
+          if (sharedMemory) {
+            // 共享記憶模式：獲取所有開啟共享記憶的對話串
+            sharedConversationIds = conversations
+              .filter((conv: any) => conv.settings?.sharedMemory === true)
+              .map((conv: any) => conv.id);
+            console.log(`🔍 共享記憶模式：找到 ${sharedConversationIds.length} 個共享對話串`);
+          } else {
+            // 非共享記憶模式：只使用當前對話串
+            sharedConversationIds = [conversationId];
+            console.log(`🔍 非共享記憶模式：只使用當前對話串 ${conversationId}`);
+          }
+        } catch (error) {
+          console.warn('Failed to read conversation settings, using only current conversation', error);
+          // 如果無法讀取設定，只使用當前對話串的記憶（安全模式）
+          sharedConversationIds = conversationId ? [conversationId] : [];
+        }
+      }
+
+      // 根據對話串設定過濾訊息
+      let filteredMessages = messages;
+      if (conversationId) {
+        if (sharedMemory) {
+          // 共享記憶模式：只包含來自共享對話串的訊息
+          filteredMessages = messages.filter(msg => 
+            !msg.conversationId || sharedConversationIds.includes(msg.conversationId)
+          );
+          console.log(`🔍 共享記憶模式：從 ${messages.length} 條訊息中過濾出 ${filteredMessages.length} 條共享訊息`);
+        } else {
+          // 非共享記憶模式：只搜尋當前對話串的訊息
+          filteredMessages = messages.filter(msg => msg.conversationId === conversationId);
+          console.log(`🔍 非共享記憶模式：從 ${messages.length} 條訊息中過濾出 ${filteredMessages.length} 條當前對話串訊息`);
+        }
+      } else {
+        console.log(`🔍 無對話串ID：使用所有 ${messages.length} 條訊息`);
+      }
+
+      // 修復：如果沒有預先構建的向量數據庫，直接從過濾後的歷史記錄構建
       if (this.conversations.length === 0) {
-        console.log('🔄 首次搜尋，嘗試從文件加載向量數據庫...');
-        const loaded = await this.loadFromFile();
-        if (!loaded) {
-          console.log('📁 文件加載失敗，從歷史記錄構建向量數據庫...');
-          await this.buildVectorDatabaseFromHistory(messages);
+        console.log('🔄 首次搜尋，從過濾後的歷史記錄構建向量數據庫...');
+        // 只使用已經過濾的訊息構建向量數據庫
+        await this.buildVectorDatabaseFromHistory(filteredMessages);
+      }
+      
+      // 修復：根據共享記憶設定重新過濾向量數據庫
+      if (conversationId) {
+        console.log(`🔍 根據共享記憶設定過濾向量數據庫，共享記憶: ${sharedMemory}`);
+        if (!sharedMemory) {
+          // 非共享記憶：只保留當前對話串的向量記憶
+          const originalLength = this.conversations.length;
+          this.conversations = this.conversations.filter(conv => 
+            conv.conversationId === conversationId
+          );
+          console.log(`🔍 非共享記憶模式：從 ${originalLength} 條向量記憶中過濾出 ${this.conversations.length} 條當前對話串記憶`);
+        } else {
+          // 共享記憶：排除當前對話串，只保留其他對話串的記憶作為"回憶"
+          const originalLength = this.conversations.length;
+          this.conversations = this.conversations.filter(conv => 
+            conv.conversationId !== conversationId && conv.conversationId !== undefined
+          );
+          console.log(`🔍 共享記憶模式（回憶模式）：從 ${originalLength} 條向量記憶中過濾出 ${this.conversations.length} 條其他對話串的記憶作為回憶（排除當前對話串 ${conversationId}）`);
         }
       }
       
@@ -151,14 +207,14 @@ export class VectorMemoryService {
       // 1. 向量搜尋（語義相似度）
       if (this.conversations.length > 0) {
         console.log('🔄 第一階段：向量搜尋（語義相似度）...');
-        const vectorResults = await this.performVectorSearch(query, topK * 4); // 獲取更多候選結果
+        const vectorResults = await this.performVectorSearch(query, topK * 4, conversationId, sharedMemory, sharedConversationIds); // 獲取更多候選結果
         results.push(...vectorResults);
         console.log(`✅ 向量搜尋找到 ${vectorResults.length} 條候選結果`);
       }
       
       // 2. 關鍵詞搜尋（精確匹配）
       console.log('🔍 第二階段：關鍵詞搜尋（精確匹配）...');
-      const keywordResults = await this.performKeywordSearch(query, messages, topK * 4);
+      const keywordResults = await this.performKeywordSearch(query, filteredMessages, topK * 4);
       results.push(...keywordResults);
       console.log(`✅ 關鍵詞搜尋找到 ${keywordResults.length} 條候選結果`);
       
@@ -189,12 +245,33 @@ export class VectorMemoryService {
   /**
    * 執行向量搜尋
    */
-  private async performVectorSearch(query: string, topK: number): Promise<VectorSearchResult[]> {
+  private async performVectorSearch(query: string, topK: number, conversationId?: string, sharedMemory: boolean = true, sharedConversationIds: string[] = []): Promise<VectorSearchResult[]> {
     try {
       const queryVector = await this.textToVector(query);
       
       const results: VectorSearchResult[] = [];
       for (const conversation of this.conversations) {
+        // 根據記憶共享設定過濾對話
+        if (conversationId) {
+          if (!sharedMemory) {
+            // 非共享模式：只搜尋當前對話串的記憶
+            if (conversation.conversationId !== conversationId) {
+              continue;
+            }
+          } else {
+            // 共享模式：只搜尋來自共享對話串的記憶
+            // 如果記憶沒有conversationId，跳過（舊的記憶）
+            if (!conversation.conversationId) {
+              continue;
+            }
+            // 只包含來自共享對話串的記憶
+            if (!sharedConversationIds.includes(conversation.conversationId)) {
+              continue;
+            }
+          }
+        }
+        // 如果沒有conversationId，使用所有記憶（向後相容）
+        
         try {
           const similarity = this.cosineSimilarity(queryVector, conversation.vector);
           results.push({
@@ -590,17 +667,8 @@ export class VectorMemoryService {
 
     console.log(`🚀 構建向量數據庫，處理 ${messages.length} 條訊息...`);
     
-    // 重要修復：如果傳入的messages太少，嘗試從文件加載更多歷史記錄
-    if (messages.length < 100) {
-      console.log('📁 傳入的歷史記錄太少，嘗試從文件加載更多記錄...');
-      const loaded = await this.loadFromFile();
-      if (loaded && this.conversations.length > 0) {
-        console.log(`✅ 已從文件加載 ${this.conversations.length} 條向量化記錄，跳過重新構建`);
-        return;
-      } else {
-        console.log('📁 文件加載失敗或沒有記錄，將使用傳入的歷史記錄進行構建');
-      }
-    }
+    // 修復：不要自動加載文件中的歷史記錄，只使用傳入的過濾後的訊息
+    console.log(`📁 使用傳入的 ${messages.length} 條過濾後的歷史記錄進行構建`);
     
     // 修復：處理所有消息，不只是連續的 user-assistant 對
     const conversationUnits: string[] = [];
@@ -618,65 +686,68 @@ export class VectorMemoryService {
     
     console.log(`📊 分類結果: 用戶消息 ${userMessages.length} 條, 助手消息 ${assistantMessages.length} 條`);
     
-    // 創建對話單元（盡可能匹配）
-    const minLength = Math.min(userMessages.length, assistantMessages.length);
-    for (let i = 0; i < minLength; i++) {
-      const conversationText = `用戶: ${userMessages[i].content}\n助手: ${assistantMessages[i].content}`;
+    // 創建對話單元（盡可能匹配），並保持conversationId信息
+    const conversationUnitsWithId: Array<{text: string, conversationId?: string}> = [];
+    
+    // 按conversationId分組處理
+    const messagesByConversation = new Map<string, ChatMessage[]>();
+    for (const message of messages) {
+      const convId = message.conversationId || 'default';
+      if (!messagesByConversation.has(convId)) {
+        messagesByConversation.set(convId, []);
+      }
+      messagesByConversation.get(convId)!.push(message);
+    }
+    
+    // 為每個對話串創建對話單元
+    for (const [convId, convMessages] of messagesByConversation) {
+      const userMsgs = convMessages.filter(m => m.role === 'user');
+      const assistantMsgs = convMessages.filter(m => m.role === 'assistant');
       
-      // 過濾掉有問題的文本
-      if (this.isValidText(conversationText)) {
-        conversationUnits.push(conversationText);
-      } else {
-        console.log(`⚠️ 跳過無效文本: ${conversationText.substring(0, 50)}...`);
-      }
-    }
-    
-    // 處理剩餘的單獨消息
-    if (userMessages.length > minLength) {
-      for (let i = minLength; i < userMessages.length; i++) {
-        const conversationText = `用戶: ${userMessages[i].content}`;
+      const minLength = Math.min(userMsgs.length, assistantMsgs.length);
+      for (let i = 0; i < minLength; i++) {
+        const conversationText = `用戶: ${userMsgs[i].content}\n助手: ${assistantMsgs[i].content}`;
+        
+        // 過濾掉有問題的文本
         if (this.isValidText(conversationText)) {
-          conversationUnits.push(conversationText);
+          conversationUnitsWithId.push({
+            text: conversationText,
+            conversationId: convId === 'default' ? undefined : convId
+          });
+        } else {
+          console.log(`⚠️ 跳過無效文本: ${conversationText.substring(0, 50)}...`);
         }
       }
     }
     
-    if (assistantMessages.length > minLength) {
-      for (let i = minLength; i < assistantMessages.length; i++) {
-        const conversationText = `助手: ${assistantMessages[i].content}`;
-        if (this.isValidText(conversationText)) {
-          conversationUnits.push(conversationText);
-        }
-      }
-    }
-    
-    console.log(`🔄 構建了 ${conversationUnits.length} 個對話單元`);
+    console.log(`🔄 構建了 ${conversationUnitsWithId.length} 個對話單元`);
     
     // 批量處理對話單元，每批10個
-    for (let i = 0; i < conversationUnits.length; i += 10) {
-      const batch = conversationUnits.slice(i, i + 10);
+    for (let i = 0; i < conversationUnitsWithId.length; i += 10) {
+      const batch = conversationUnitsWithId.slice(i, i + 10);
       
       try {
         await Promise.all(
-          batch.map(async (conversationText) => {
+          batch.map(async (unit) => {
             try {
-              const vector = await this.textToVector(conversationText);
+              const vector = await this.textToVector(unit.text);
               const normalizedVector = this.normalizeVector(vector);
               
               this.conversations.push({
-                text: conversationText,
+                text: unit.text,
                 vector: normalizedVector,
                 timestamp: new Date(),
-                role: 'assistant' // 對話單元中的角色
+                role: 'assistant', // 對話單元中的角色
+                conversationId: unit.conversationId
               });
             } catch (error) {
-              console.warn(`向量化失敗: ${conversationText.substring(0, 50)}...`);
+              console.warn(`向量化失敗: ${unit.text.substring(0, 50)}...`);
             }
           })
         );
         
         if (i % 50 === 0) {
-          console.log(`📝 向量化進度: ${Math.min(i + 10, conversationUnits.length)}/${conversationUnits.length}`);
+          console.log(`📝 向量化進度: ${Math.min(i + 10, conversationUnitsWithId.length)}/${conversationUnitsWithId.length}`);
         }
       } catch (error) {
         console.error(`批次 ${Math.floor(i / 10) + 1} 處理失敗:`, error);
@@ -731,7 +802,7 @@ export class VectorMemoryService {
   /**
    * 添加新對話到向量數據庫（參考 CABM 的 add_chat_turn）
    */
-  async addConversation(userMessage: string, assistantMessage: string): Promise<void> {
+  async addConversation(userMessage: string, assistantMessage: string, conversationId?: string): Promise<void> {
     if (!this.client) return;
 
     const conversationText = `用戶: ${userMessage}\n助手: ${assistantMessage}`;
@@ -757,10 +828,11 @@ export class VectorMemoryService {
         text: conversationText,
         vector: normalizedVector,
         timestamp: new Date(),
-        role: 'assistant' // 對話單元中的角色
+        role: 'assistant', // 對話單元中的角色
+        conversationId: conversationId
       });
       
-      console.log(`💾 新對話已添加到向量數據庫: ${userMessage.substring(0, 50)}...`);
+      console.log(`💾 新對話已添加到向量數據庫: ${userMessage.substring(0, 50)}... (conversationId: ${conversationId})`);
       
       // 保存到文件
       await this.saveToFile();
@@ -812,6 +884,27 @@ export class VectorMemoryService {
   }
 
   /**
+   * 刪除特定對話串的所有記憶
+   */
+  async removeConversationById(conversationId: string): Promise<void> {
+    try {
+      const initialLength = this.conversations.length;
+      this.conversations = this.conversations.filter(conv => conv.conversationId !== conversationId);
+      
+      const removedCount = initialLength - this.conversations.length;
+      if (removedCount > 0) {
+        // 保存到檔案
+        await this.saveToFile();
+        console.log(`✅ 已從向量資料庫刪除對話串 ${conversationId} 的 ${removedCount} 個記憶`);
+      } else {
+        console.log(`⚠️ 對話串 ${conversationId} 沒有找到相關記憶`);
+      }
+    } catch (error) {
+      console.error('❌ 刪除對話串記憶失敗:', error);
+    }
+  }
+
+  /**
    * 保存向量數據庫到文件（真正參考 CABM 架構）
    */
   private async saveToFile(): Promise<void> {
@@ -845,7 +938,7 @@ export class VectorMemoryService {
   /**
    * 從文件加載向量數據庫（真正參考 CABM 架構）
    */
-  private async loadFromFile(): Promise<boolean> {
+  private async loadFromFile(conversationId?: string): Promise<boolean> {
     try {
       const fs = await import('fs/promises');
       const path = await import('path');
@@ -869,17 +962,27 @@ export class VectorMemoryService {
       this.model = data.model || this.model;
       this.vectorDimension = data.vector_dimension || this.vectorDimension;
       
-      // 恢復對話數據
+      // 恢復對話數據，根據conversationId過濾
       if (data.conversations && Array.isArray(data.conversations)) {
-        this.conversations = data.conversations.map((conv: any) => ({
+        let filteredConversations = data.conversations;
+        
+        // 如果指定了conversationId，只加載該對話串的記憶
+        if (conversationId) {
+          filteredConversations = data.conversations.filter((conv: any) => 
+            conv.conversationId === conversationId
+          );
+        }
+        
+        this.conversations = filteredConversations.map((conv: any) => ({
           text: conv.text,
           vector: conv.vector,
           timestamp: new Date(conv.timestamp),
-          role: conv.role || 'assistant' // 對話單元中的角色
+          role: conv.role || 'assistant', // 對話單元中的角色
+          conversationId: conv.conversationId // 恢復conversationId
         }));
         
         console.log(`📂 從文件加載向量數據庫成功: ${filePath}`);
-        console.log(`📊 恢復了 ${this.conversations.length} 條對話向量`);
+        console.log(`📊 恢復了 ${this.conversations.length} 條對話向量${conversationId ? ` (對話串: ${conversationId})` : ''}`);
         return true;
       } else {
         console.log(`⚠️ 文件格式不正確，沒有找到對話數據`);

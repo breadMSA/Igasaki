@@ -8,7 +8,7 @@ const router = express.Router();
  */
 router.post('/search', async (req, res) => {
   try {
-    const { query, messages, topK = 10 } = req.body;
+    const { query, messages, topK = 10, conversationId, sharedMemory = true } = req.body;
 
     if (!query || !messages) {
       return res.status(400).json({ 
@@ -16,12 +16,14 @@ router.post('/search', async (req, res) => {
       });
     }
 
-    console.log(`🔍 向量搜尋: "${query}" (topK: ${topK})`);
+    console.log(`🔍 向量搜尋: "${query}" (topK: ${topK}, conversationId: ${conversationId}, sharedMemory: ${sharedMemory})`);
     
     const results = await vectorMemoryService.searchRelevantHistory(
       query, 
       messages, 
-      topK
+      topK,
+      conversationId,
+      sharedMemory
     );
 
     console.log(`✅ 找到 ${results.length} 條相關記錄`);
@@ -30,7 +32,9 @@ router.post('/search', async (req, res) => {
       success: true,
       results,
       query,
-      totalFound: results.length
+      totalFound: results.length,
+      conversationId,
+      sharedMemory
     });
 
   } catch (error) {
@@ -82,7 +86,7 @@ router.post('/vectorize', async (req, res) => {
  */
 router.post('/add', async (req, res) => {
   try {
-    const { userMessage, assistantMessage } = req.body;
+    const { userMessage, assistantMessage, conversationId } = req.body;
 
     if (!userMessage || !assistantMessage) {
       return res.status(400).json({ 
@@ -90,9 +94,9 @@ router.post('/add', async (req, res) => {
       });
     }
 
-    console.log(`💾 添加新對話到向量記憶: ${userMessage.substring(0, 50)}...`);
+    console.log(`💾 添加新對話到向量記憶: ${userMessage.substring(0, 50)}... (conversationId: ${conversationId})`);
     
-    await vectorMemoryService.addConversation(userMessage, assistantMessage);
+    await vectorMemoryService.addConversation(userMessage, assistantMessage, conversationId);
 
     res.json({
       success: true,
